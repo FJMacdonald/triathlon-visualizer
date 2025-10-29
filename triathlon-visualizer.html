@@ -1,0 +1,2416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Triathlon Results Visualizer</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            padding: 30px;
+        }
+
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+        }
+
+        .upload-section {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 30px;
+            transition: all 0.3s ease;
+        }
+
+        .upload-section.has-data {
+            padding: 20px;
+            background: #f8f9fa;
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            display: inline-block;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+
+        .file-input-label {
+            display: inline-block;
+            padding: 12px 30px;
+            background: white;
+            color: #667eea;
+            border-radius: 50px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .file-input-label:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+        }
+
+        .file-input-label.has-file {
+            background: #28a745;
+            color: white;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .file-name {
+            color: white;
+            margin-top: 10px;
+            font-size: 14px;
+        }
+
+        .has-data .file-name {
+            color: #666;
+        }
+
+        .chart-container {
+            margin: 40px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 15px;
+            display: none;
+        }
+
+        .chart-container.active {
+            display: block;
+        }
+
+        .chart-title {
+            font-size: 1.5em;
+            color: #333;
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover {
+            background: #5a67d8;
+            transform: translateY(-1px);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn.active {
+            background: #4c51bf;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .btn.toggle-all {
+            background: #28a745;
+        }
+
+        .btn.toggle-all:hover {
+            background: #218838;
+        }
+
+        .legend-container {
+            margin: 20px 0;
+            padding: 15px;
+            background: white;
+            border-radius: 10px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .legend-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .athlete-legend {
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .country-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .country-item {
+            display: inline-flex;
+            align-items: center;
+            padding: 5px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s ease;
+            user-select: none;
+            border: 1px solid #ddd;
+        }
+
+        .country-item:hover {
+            background: #f0f0f0;
+        }
+
+        .country-item.hidden {
+            opacity: 0.3;
+            background: #f8f8f8;
+        }
+
+        .country-flag {
+            margin-right: 5px;
+            font-size: 16px;
+        }
+
+        .legend-item {
+            display: inline-flex;
+            align-items: center;
+            margin: 5px 15px 5px 0;
+            cursor: pointer;
+            padding: 5px 10px;
+            border-radius: 5px;
+            transition: background 0.3s ease;
+            user-select: none;
+        }
+
+        .legend-item:hover {
+            background: #f0f0f0;
+        }
+
+        .legend-item.hidden {
+            opacity: 0.3;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 3px;
+            margin-right: 8px;
+            border-radius: 2px;
+        }
+
+        .legend-text {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .tooltip {
+            position: absolute;
+            text-align: left;
+            padding: 10px;
+            font-size: 12px;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            border-radius: 5px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 1000;
+        }
+
+        .error-message {
+            color: #dc3545;
+            margin-top: 10px;
+            padding: 10px;
+            background: #f8d7da;
+            border-radius: 5px;
+            display: none;
+        }
+
+        .stats-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+
+        svg {
+            display: block;
+            margin: 0 auto;
+        }
+
+        .axis {
+            font-size: 12px;
+        }
+
+        .axis-label {
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .grid line {
+            stroke: #e0e0e0;
+            stroke-opacity: 0.7;
+            shape-rendering: crispEdges;
+        }
+
+        .grid path {
+            stroke-width: 0;
+        }
+
+        .segment-leader {
+            font-size: 11px;
+            font-weight: bold;
+        }
+
+        .segment-time-label {
+            font-size: 10px;
+            font-weight: 600;
+            fill: #666;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px;
+            }
+
+            h1 {
+                font-size: 1.8em;
+            }
+
+            .controls {
+                flex-direction: column;
+            }
+
+            .btn {
+                width: 100%;
+            }
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .tab-navigation {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 30px 0 20px 0;
+            border-bottom: 2px solid #e0e0e0;
+            padding-bottom: 10px;
+        }
+
+        .tab-btn {
+            padding: 10px 20px;
+            background: transparent;
+            color: #666;
+            border: none;
+            border-radius: 5px 5px 0 0;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .tab-btn:hover {
+            background: #f0f0f0;
+        }
+
+        .tab-btn.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .chart-section {
+            display: none;
+        }
+
+        .chart-section.active {
+            display: block;
+        }
+
+        .athlete-path.hidden {
+            display: none;
+        }
+
+        .athlete-circle.hidden {
+            display: none;
+        }
+
+        .radar-area.hidden {
+            display: none;
+        }
+
+        .radar-dots.hidden {
+            display: none;
+        }
+        
+        .zoom-overlay {
+            cursor: crosshair;
+        }
+        
+        .zoom-overlay.active {
+            fill: rgba(100, 150, 255, 0.05);
+        }
+        
+        .zoom-selection {
+            fill: rgba(100, 100, 200, 0.2);
+            stroke: rgba(100, 100, 200, 0.8);
+            stroke-width: 1;
+            stroke-dasharray: 3,3;
+        }
+        
+        .zoom-hint {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(102, 126, 234, 0.95);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 5px;
+            font-size: 14px;
+            font-weight: 500;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+            z-index: 2000;
+            display: none;
+            animation: fadeIn 0.3s ease-in;
+        }
+        
+        .zoom-hint.active {
+            display: block;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏊‍♂️🚴‍♂️🏃‍♂️ Triathlon Results Visualizer</h1>
+        
+        <div class="upload-section" id="uploadSection">
+            <div class="file-input-wrapper">
+                <label for="csvFile" class="file-input-label" id="fileLabel">
+                    Choose CSV File
+                </label>
+                <input type="file" id="csvFile" accept=".csv">
+            </div>
+            <div class="file-name" id="fileName"></div>
+            <div class="error-message" id="errorMessage"></div>
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Processing results...</p>
+        </div>
+
+        <div id="resultsSection" style="display: none;">
+            <div class="stats-summary" id="statsSummary"></div>
+            
+            <div class="tab-navigation">
+                <button class="tab-btn active" onclick="showTab('rank')">Rank Chart</button>
+                <button class="tab-btn" onclick="showTab('development')">Race Development</button>
+                <button class="tab-btn" onclick="showTab('spider')">Spider Chart</button>
+            </div>
+
+            <div id="rankSection" class="chart-section active">
+                <div class="chart-container active">
+                    <div class="chart-title">Race Position Changes</div>
+                    <div id="rankChart"></div>
+                </div>
+            </div>
+
+            <div id="developmentSection" class="chart-section">
+                <div class="chart-container active">
+                    <div class="chart-title">Race Development</div>
+                    <div id="developmentChart"></div>
+                    <div class="controls">
+                        <button class="btn active" onclick="showSection('all')">All</button>
+                        <button class="btn" onclick="showSection('swim')">Swim</button>
+                        <button class="btn" onclick="showSection('t1')">T1</button>
+                        <button class="btn" onclick="showSection('bike')">Bike</button>
+                        <button class="btn" onclick="showSection('t2')">T2</button>
+                        <button class="btn" onclick="showSection('run')">Run</button>
+                        <button class="btn" onclick="enableZoomMode()" title="Hold Shift key and drag to zoom">🔍 Zoom (Hold Shift)</button>
+                        <button class="btn" onclick="resetZoom()">↺ Reset</button>
+                    </div>
+                    <div class="legend-container" id="developmentLegend"></div>
+                </div>
+            </div>
+
+            <div id="spiderSection" class="chart-section">
+                <div class="chart-container active">
+                    <div class="chart-title">Performance Comparison</div>
+                    <div id="spiderChart"></div>
+                    <div class="legend-container" id="spiderLegend"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="tooltip" id="tooltip"></div>
+    <div class="zoom-hint" id="zoomHint">Hold <strong>Shift</strong> and drag to select area to zoom</div>
+
+    <script>
+        // Global variables
+        let raceData = null;
+        let processedData = null;
+        let colorScale = null;
+        let developmentSvg = null;
+        let developmentG = null;
+        let developmentChartData = null;
+        let developmentAthleteVisibility = {};
+        let developmentCountryVisibility = {};
+        let spiderAthleteVisibility = {};
+        let currentSection = 'all';
+        let currentXScale = null;
+        let currentYScale = null;
+        let chartWidth = 0;
+        let chartHeight = 0;
+        let sectionBounds = {};
+        let segmentLeaders = {};
+        let originalXScale = null;
+        let originalYScale = null;
+        let stageDist = {};
+        let zoomMode = false;
+        let zoomRect = null;
+        let zoomStartX = null;
+        let zoomStartY = null;
+        let lineGenerator = null;
+        
+        // Country flags mapping
+        const countryFlags = {
+            'AUS': '🇦🇺', 'ITA': '🇮🇹', 'HUN': '🇭🇺', 'JPN': '🇯🇵', 'ESP': '🇪🇸',
+            'CZE': '🇨🇿', 'CHI': '🇨🇱', 'CHL': '🇨🇱', 'FRA': '🇫🇷', 'CAN': '🇨🇦', 
+            'SUI': '🇨🇭', 'NED': '🇳🇱', 'GER': '🇩🇪', 'BEL': '🇧🇪', 'GBR': '🇬🇧', 
+            'USA': '🇺🇸', 'NZL': '🇳🇿', 'AUT': '🇦🇹', 'POR': '🇵🇹', 'BRA': '🇧🇷', 
+            'MEX': '🇲🇽', 'ARG': '🇦🇷', 'RSA': '🇿🇦', 'NOR': '🇳🇴', 'SWE': '🇸🇪', 
+            'DEN': '🇩🇰'
+        };
+        
+        // Tab navigation
+        function showTab(tabName) {
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            document.querySelectorAll('.chart-section').forEach(section => {
+                section.classList.remove('active');
+            });
+            document.getElementById(tabName + 'Section').classList.add('active');
+        }
+
+        // Section navigation for development chart
+        function showSection(section) {
+            currentSection = section;
+            zoomMode = false; // Disable zoom mode when changing sections
+            
+            // Hide zoom hint
+            document.getElementById('zoomHint').classList.remove('active');
+            
+            document.querySelectorAll('.controls .btn').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.textContent.toLowerCase().includes(section) || 
+                    (section === 'all' && btn.textContent === 'All')) {
+                    btn.classList.add('active');
+                }
+            });
+            
+            // Remove zoom overlay and clean up events if exists
+            if (developmentSvg) {
+                developmentSvg.select(".zoom-overlay").remove();
+                developmentSvg.select(".zoom-selection").remove();
+            }
+            
+            // Clean up window-level zoom events
+            d3.select(window).on("mousemove.zoom", null);
+            d3.select(window).on("mouseup.zoom", null);
+            d3.select(window).on("keydown.zoom", null);
+            d3.select(window).on("keyup.zoom", null);
+            
+            updateDevelopmentChart();
+        }
+        
+        function enableZoomMode() {
+            zoomMode = true;
+            currentSection = 'zoom';
+            document.querySelectorAll('.controls .btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            // Show zoom hint
+            document.getElementById('zoomHint').classList.add('active');
+            
+            // Add zoom interaction overlay
+            if (developmentSvg) {
+                const margin = {top: 40, right: 150, bottom: 60, left: 100};
+                
+                // Remove any existing zoom overlay
+                developmentSvg.select(".zoom-overlay").remove();
+                
+                // Track if we're currently dragging
+                let isDragging = false;
+                let overlayActive = false;
+                
+                // Create zoom overlay that only blocks events while dragging
+                const zoomOverlay = developmentSvg.append("rect")
+                    .attr("class", "zoom-overlay")
+                    .attr("x", margin.left)
+                    .attr("y", margin.top)
+                    .attr("width", chartWidth)
+                    .attr("height", chartHeight)
+                    .style("fill", "none")
+                    .style("pointer-events", "none")  // Start with events passing through
+                    .style("cursor", "crosshair");
+                
+                // Use SVG-level mouse events to detect when to activate overlay
+                const svgNode = developmentSvg.node();
+                const zoomHint = document.getElementById('zoomHint');
+                
+                // Listen for Shift key + mouse move to enable zoom selection mode
+                d3.select(window).on("keydown.zoom", function(event) {
+                    if (event.key === 'Shift' && zoomMode && !isDragging) {
+                        zoomOverlay.style("pointer-events", "all").classed("active", true);
+                        overlayActive = true;
+                        zoomHint.innerHTML = 'Drag to select area to zoom';
+                        zoomHint.style.background = 'rgba(40, 167, 69, 0.95)';
+                    }
+                });
+                
+                d3.select(window).on("keyup.zoom", function(event) {
+                    if (event.key === 'Shift' && !isDragging) {
+                        zoomOverlay.style("pointer-events", "none").classed("active", false);
+                        overlayActive = false;
+                        zoomHint.innerHTML = 'Hold <strong>Shift</strong> and drag to select area to zoom';
+                        zoomHint.style.background = 'rgba(102, 126, 234, 0.95)';
+                    }
+                });
+                
+                // Add drag behavior for zoom selection
+                zoomOverlay.on("mousedown", function(event) {
+                    if (!zoomMode || !overlayActive) return;
+                    
+                    isDragging = true;
+                    const [x, y] = d3.pointer(event, this);
+                    zoomStartX = x - margin.left;
+                    zoomStartY = y - margin.top;
+                    
+                    // Keep overlay active while dragging
+                    d3.select(this).style("pointer-events", "all");
+                    
+                    // Remove any existing selection rectangle
+                    developmentSvg.select(".zoom-selection").remove();
+                    
+                    // Create selection rectangle
+                    zoomRect = developmentSvg.append("rect")
+                        .attr("class", "zoom-selection")
+                        .attr("x", x)
+                        .attr("y", y)
+                        .attr("width", 0)
+                        .attr("height", 0)
+                        .style("fill", "rgba(100, 100, 200, 0.2)")
+                        .style("stroke", "rgba(100, 100, 200, 0.8)")
+                        .style("stroke-width", 1)
+                        .style("stroke-dasharray", "3,3")
+                        .style("pointer-events", "none");  // Don't interfere with mouse events
+                    
+                    event.preventDefault();  // Prevent text selection
+                });
+                
+                // Use window-level events for move and up to ensure we capture them
+                d3.select(window).on("mousemove.zoom", function(event) {
+                    if (!zoomMode || !isDragging || !zoomRect) return;
+                    
+                    // Get mouse position relative to the overlay
+                    const rect = svgNode.getBoundingClientRect();
+                    const x = event.clientX - rect.left;
+                    const y = event.clientY - rect.top;
+                    
+                    const currentX = Math.min(Math.max(0, x - margin.left), chartWidth);
+                    const currentY = Math.min(Math.max(0, y - margin.top), chartHeight);
+                    
+                    const width = Math.abs(currentX - zoomStartX);
+                    const height = Math.abs(currentY - zoomStartY);
+                    
+                    zoomRect
+                        .attr("x", Math.min(currentX, zoomStartX) + margin.left)
+                        .attr("y", Math.min(currentY, zoomStartY) + margin.top)
+                        .attr("width", width)
+                        .attr("height", height);
+                });
+                
+                d3.select(window).on("mouseup.zoom", function(event) {
+                    if (!zoomMode || !isDragging || !zoomRect) return;
+                    
+                    isDragging = false;
+                    
+                    // Get final position
+                    const rect = svgNode.getBoundingClientRect();
+                    const x = event.clientX - rect.left;
+                    const y = event.clientY - rect.top;
+                    
+                    const endX = Math.min(Math.max(0, x - margin.left), chartWidth);
+                    const endY = Math.min(Math.max(0, y - margin.top), chartHeight);
+                    
+                    // Apply zoom if selection is valid (minimum 10px in each direction)
+                    if (Math.abs(endX - zoomStartX) > 10 && Math.abs(endY - zoomStartY) > 10) {
+                        const x1 = Math.min(zoomStartX, endX);
+                        const x2 = Math.max(zoomStartX, endX);
+                        const y1 = Math.min(zoomStartY, endY);
+                        const y2 = Math.max(zoomStartY, endY);
+                        
+                        // Calculate new domain based on selection
+                        const xDomain = [
+                            currentXScale.invert(x1),
+                            currentXScale.invert(x2)
+                        ];
+                        const yDomain = [
+                            currentYScale.invert(y2),
+                            currentYScale.invert(y1)
+                        ];
+                        
+                        // Update scales
+                        currentXScale.domain(xDomain);
+                        currentYScale.domain(yDomain);
+                        
+                        // Update chart
+                        updateDevelopmentChart();
+                    }
+                    
+                    // Clean up - check if Shift is still pressed
+                    developmentSvg.select(".zoom-selection").remove();
+                    if (!event.shiftKey) {
+                        zoomOverlay.style("pointer-events", "none").classed("active", false);
+                        overlayActive = false;
+                        zoomHint.innerHTML = 'Hold <strong>Shift</strong> and drag to select area to zoom';
+                        zoomHint.style.background = 'rgba(102, 126, 234, 0.95)';
+                    }
+                    zoomRect = null;
+                    zoomStartX = null;
+                    zoomStartY = null;
+                });
+            }
+        }
+        
+        function resetZoom() {
+            if (originalXScale && originalYScale) {
+                // Hide zoom hint
+                document.getElementById('zoomHint').classList.remove('active');
+                
+                currentXScale.domain(originalXScale.domain());
+                currentYScale.domain(originalYScale.domain());
+                currentSection = 'all';
+                showSection('all');
+            }
+        }
+
+        // File upload handler
+        document.getElementById('csvFile').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const fileName = file.name;
+                document.getElementById('fileName').textContent = `Selected: ${fileName}`;
+                document.getElementById('fileLabel').classList.add('has-file');
+                document.getElementById('fileLabel').textContent = '✓ File Selected';
+                document.getElementById('uploadSection').classList.add('has-data');
+                
+                document.getElementById('loading').classList.add('active');
+                
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const text = e.target.result;
+                        raceData = parseCSV(text);
+                        processedData = processRaceData(raceData);
+                        
+                        document.getElementById('loading').classList.remove('active');
+                        document.getElementById('resultsSection').style.display = 'block';
+                        
+                        displayStats(processedData);
+                        
+                        // Initialize visibility
+                        const countries = new Set();
+                        processedData.forEach(athlete => {
+                            developmentAthleteVisibility[athlete.name] = true;
+                            spiderAthleteVisibility[athlete.name] = athlete.position <= 5;
+                            countries.add(athlete.country);
+                        });
+                        
+                        countries.forEach(country => {
+                            developmentCountryVisibility[country] = true;
+                        });
+                        
+                        // Find segment leaders
+                        findSegmentLeaders(processedData);
+                        
+                        // Create visualizations
+                        createColorScale(processedData);
+                        drawRankChart(processedData);
+                        drawDevelopmentChart(processedData);
+                        drawSpiderChart(processedData);
+                        
+                    } catch (error) {
+                        console.error('Error processing file:', error);
+                        document.getElementById('errorMessage').textContent = 'Error processing file: ' + error.message;
+                        document.getElementById('errorMessage').style.display = 'block';
+                        document.getElementById('loading').classList.remove('active');
+                    }
+                };
+                reader.readAsText(file);
+            }
+        });
+
+        function parseCSV(text) {
+            const lines = text.split('\n');
+            const headers = lines[0].split(',').map(h => h.trim());
+            const data = [];
+            
+            for (let i = 1; i < lines.length; i++) {
+                if (lines[i].trim() === '') continue;
+                const values = lines[i].split(',');
+                const row = {};
+                headers.forEach((header, index) => {
+                    row[header] = values[index] ? values[index].trim() : '';
+                });
+                data.push(row);
+            }
+            
+            return data;
+        }
+
+        function timeToSeconds(timeStr) {
+            if (!timeStr || timeStr === '' || timeStr === 'DNF' || timeStr === 'DSQ') return null;
+            const parts = timeStr.split(':');
+            if (parts.length !== 3) return null;
+            return parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 + parseInt(parts[2]);
+        }
+
+        function secondsToTime(seconds) {
+            if (seconds === null || seconds === undefined) return '';
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            const secs = Math.floor(seconds % 60);
+            if (hours > 0) {
+                return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            } else {
+                return `${minutes}:${secs.toString().padStart(2, '0')}`;
+            }
+        }
+
+        function secondsToMinSec(seconds) {
+            const minutes = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            if (seconds >= 3600) {
+                const hours = Math.floor(seconds / 3600);
+                const mins = Math.floor((seconds % 3600) / 60);
+                return `${hours}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            }
+            return `${minutes}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        function processRaceData(data) {
+            const processed = [];
+            
+            // Process all athletes including DNF, DSQ, LAP, and DNS
+            data.forEach((athlete, index) => {
+                const swimTime = timeToSeconds(athlete.Swim);
+                const t1Time = timeToSeconds(athlete.T1);
+                const bikeTime = timeToSeconds(athlete.Bike);
+                const t2Time = timeToSeconds(athlete.T2);
+                const runTime = timeToSeconds(athlete.Run);
+                const totalTime = timeToSeconds(athlete['Total Time']);
+                const status = athlete.Status || '';
+                
+                // Keep athlete name clean, status tracked separately
+                let displayName = `${athlete['Athlete First Name']} ${athlete['Athlete Last Name']}`;
+                
+                // Handle different athlete statuses with 99hrs penalty for sorting
+                const penaltyTime = 99 * 3600; // 99 hours in seconds
+                let processedAthlete = {
+                    name: displayName,
+                    baseName: `${athlete['Athlete First Name']} ${athlete['Athlete Last Name']}`,
+                    country: athlete.Country,
+                    position: athlete.Position ? parseInt(athlete.Position) : null,
+                    status: status,
+                    swimTime: swimTime || (status === 'DNS' ? penaltyTime : 0),
+                    t1Time: t1Time || (status === 'DNS' ? penaltyTime : 0),
+                    bikeTime: bikeTime || penaltyTime,
+                    t2Time: t2Time || penaltyTime,
+                    runTime: runTime || penaltyTime,
+                    // Store actual times for display purposes
+                    actualSwimTime: swimTime,
+                    actualT1Time: t1Time,
+                    actualBikeTime: bikeTime,
+                    actualT2Time: t2Time,
+                    actualRunTime: runTime
+                };
+                
+                // Calculate cumulative times with penalties
+                processedAthlete.swimCumulative = processedAthlete.swimTime;
+                processedAthlete.t1Cumulative = processedAthlete.swimCumulative + processedAthlete.t1Time;
+                processedAthlete.bikeCumulative = processedAthlete.t1Cumulative + processedAthlete.bikeTime;
+                processedAthlete.t2Cumulative = processedAthlete.bikeCumulative + processedAthlete.t2Time;
+                processedAthlete.totalCumulative = processedAthlete.t2Cumulative + processedAthlete.runTime;
+                processedAthlete.totalTime = processedAthlete.totalCumulative;
+                
+                processed.push(processedAthlete);
+            });
+            
+            // Sort DNS athletes alphabetically
+            const dnsAthletes = processed.filter(a => a.status === 'DNS');
+            dnsAthletes.sort((a, b) => a.baseName.localeCompare(b.baseName));
+            
+            // Sort all athletes by total cumulative time
+            processed.sort((a, b) => a.totalCumulative - b.totalCumulative);
+            
+            // Calculate ranks for all athletes with proper tie handling
+            let currentRank = 1;
+            processed.forEach((athlete, index) => {
+                if (athlete.status === 'DSQ' || athlete.status === 'DNF' || 
+                    athlete.status === 'LAP' || athlete.status === 'DNS') {
+                    athlete.finalRank = null; // No numeric rank for these statuses
+                } else {
+                    athlete.finalRank = currentRank++;
+                }
+            });
+            
+            // Calculate swim ranks with tie-breaking by final position
+            processed.forEach((athlete, index) => {
+                if (athlete.actualSwimTime) {
+                    // Count how many have strictly faster swim times
+                    const fasterSwimmers = processed.filter(a => a.actualSwimTime && a.swimCumulative < athlete.swimCumulative).length;
+                    // Count swimmers with same time but better final position
+                    const sameTimbetterFinish = processed.filter(a => 
+                        a.actualSwimTime && 
+                        a.swimCumulative === athlete.swimCumulative && 
+                        a.totalCumulative < athlete.totalCumulative
+                    ).length;
+                    athlete.swimRank = fasterSwimmers + sameTimbetterFinish + 1;
+                } else {
+                    athlete.swimRank = index + 1; // Use position for those who didn't complete
+                }
+                
+                if (athlete.actualT1Time) {
+                    athlete.t1Rank = processed.filter(a => a.t1Cumulative < athlete.t1Cumulative).length + 1;
+                } else {
+                    athlete.t1Rank = index + 1;
+                }
+                
+                if (athlete.actualBikeTime) {
+                    athlete.bikeRank = processed.filter(a => a.bikeCumulative < athlete.bikeCumulative).length + 1;
+                } else {
+                    athlete.bikeRank = index + 1;
+                }
+                
+                if (athlete.actualT2Time) {
+                    athlete.t2Rank = processed.filter(a => a.t2Cumulative < athlete.t2Cumulative).length + 1;
+                } else {
+                    athlete.t2Rank = index + 1;
+                }
+                
+                // Calculate segment-only ranks for performance comparison
+                const finishers = processed.filter(a => !['DNF', 'DSQ', 'LAP', 'DNS'].includes(a.status));
+                
+                if (athlete.actualSwimTime) {
+                    athlete.swimSegmentRank = finishers.filter(a => a.actualSwimTime && a.actualSwimTime < athlete.actualSwimTime).length + 1;
+                }
+                if (athlete.actualT1Time) {
+                    athlete.t1SegmentRank = finishers.filter(a => a.actualT1Time && a.actualT1Time < athlete.actualT1Time).length + 1;
+                }
+                if (athlete.actualBikeTime) {
+                    athlete.bikeSegmentRank = finishers.filter(a => a.actualBikeTime && a.actualBikeTime < athlete.actualBikeTime).length + 1;
+                }
+                if (athlete.actualT2Time) {
+                    athlete.t2SegmentRank = finishers.filter(a => a.actualT2Time && a.actualT2Time < athlete.actualT2Time).length + 1;
+                }
+                if (athlete.actualRunTime) {
+                    athlete.runSegmentRank = finishers.filter(a => a.actualRunTime && a.actualRunTime < athlete.actualRunTime).length + 1;
+                }
+            });
+            
+            return processed;
+        }
+
+        function findSegmentLeaders(data) {
+            // Only consider finishers for segment leaders
+            const finishers = data.filter(a => !['DNF', 'DSQ', 'LAP', 'DNS'].includes(a.status) && a.actualSwimTime);
+            
+            if (finishers.length > 0) {
+                segmentLeaders.swim = finishers.reduce((min, athlete) => 
+                    (athlete.actualSwimTime && athlete.actualSwimTime < min.actualSwimTime) ? athlete : min, finishers[0]);
+                segmentLeaders.t1 = finishers.reduce((min, athlete) => 
+                    (athlete.actualT1Time && athlete.actualT1Time < min.actualT1Time) ? athlete : min, finishers[0]);
+                segmentLeaders.bike = finishers.reduce((min, athlete) => 
+                    (athlete.actualBikeTime && athlete.actualBikeTime < min.actualBikeTime) ? athlete : min, finishers[0]);
+                segmentLeaders.t2 = finishers.reduce((min, athlete) => 
+                    (athlete.actualT2Time && athlete.actualT2Time < min.actualT2Time) ? athlete : min, finishers[0]);
+                segmentLeaders.run = finishers.reduce((min, athlete) => 
+                    (athlete.actualRunTime && athlete.actualRunTime < min.actualRunTime) ? athlete : min, finishers[0]);
+            }
+        }
+
+        function displayStats(data) {
+            // Calculate finishers and starters (excluding DNS)
+            const finishers = data.filter(a => !['DNF', 'DSQ', 'LAP', 'DNS'].includes(a.status));
+            const starters = data.filter(a => a.status !== 'DNS'); // Everyone who actually started the race
+            const avgSwim = d3.mean(finishers, d => d.actualSwimTime || 0);
+            const avgBike = d3.mean(finishers, d => d.actualBikeTime || 0);
+            const avgRun = d3.mean(finishers, d => d.actualRunTime || 0);
+            
+            const winner = finishers.find(a => a.finalRank === 1);
+            const winnerTime = winner ? winner.actualSwimTime + winner.actualT1Time + winner.actualBikeTime + winner.actualT2Time + winner.actualRunTime : 0;
+            
+            const statsHTML = `
+                <div class="stat-item">
+                    <div class="stat-value">${finishers.length}/${starters.length}</div>
+                    <div class="stat-label">Finishers</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">${secondsToTime(winnerTime)}</div>
+                    <div class="stat-label">Winner Time</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">${secondsToMinSec(avgSwim)}</div>
+                    <div class="stat-label">Avg Swim</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">${secondsToMinSec(avgBike)}</div>
+                    <div class="stat-label">Avg Bike</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">${secondsToMinSec(avgRun)}</div>
+                    <div class="stat-label">Avg Run</div>
+                </div>
+            `;
+            document.getElementById('statsSummary').innerHTML = statsHTML;
+        }
+
+        function createColorScale(data) {
+            const colors = [
+                '#e41a1c', '#377eb8', '#4daf4a', '#984ea3', '#ff7f00',
+                '#a65628', '#f781bf', '#999999', '#66c2a5', '#fc8d62',
+                '#8da0cb', '#e78ac3', '#a6d854', '#ffd92f', '#e5c494',
+                '#b3b3b3', '#1b9e77', '#d95f02', '#7570b3', '#e7298a',
+                '#66a61e', '#e6ab02', '#a6761d', '#666666'
+            ];
+            
+            while (colors.length < data.length) {
+                colors.push(`hsl(${Math.random() * 360}, 70%, 50%)`);
+            }
+            
+            colorScale = d3.scaleOrdinal()
+                .domain(data.map(d => d.name))
+                .range(colors);
+        }
+
+        function drawRankChart(data) {
+            d3.select("#rankChart").selectAll("*").remove();
+            
+            // Separate DSQ athletes and sort by their would-be finish time
+            const dsqAthletes = data.filter(a => a.status === 'DSQ')
+                .sort((a, b) => {
+                    // Sort by actual total time if available
+                    const aTime = (a.actualSwimTime || 0) + (a.actualT1Time || 0) + 
+                                 (a.actualBikeTime || 0) + (a.actualT2Time || 0) + (a.actualRunTime || 0);
+                    const bTime = (b.actualSwimTime || 0) + (b.actualT1Time || 0) + 
+                                 (b.actualBikeTime || 0) + (b.actualT2Time || 0) + (b.actualRunTime || 0);
+                    return aTime - bTime;
+                });
+            const nonDsqData = data.filter(a => a.status !== 'DSQ');
+            
+            const margin = {top: 40, right: 200, bottom: 40, left: 60};
+            const width = Math.min(1200, window.innerWidth - 100) - margin.left - margin.right;
+            const height = Math.max(400, data.length * 15) - margin.top - margin.bottom;
+            
+            const svg = d3.select("#rankChart")
+                .append("svg")
+                .attr("width", width + margin.left + margin.right)
+                .attr("height", height + margin.top + margin.bottom)
+                .append("g")
+                .attr("transform", `translate(${margin.left},${margin.top})`);
+            
+            // Calculate averages only from finishers for proper scaling
+            const finishers = data.filter(a => !['DNF', 'DSQ', 'LAP', 'DNS'].includes(a.status));
+            const avgSwim = d3.mean(finishers, d => d.actualSwimTime || 0);
+            const avgT1 = d3.mean(finishers, d => d.actualT1Time || 0);
+            const avgBike = d3.mean(finishers, d => d.actualBikeTime || 0);
+            const avgT2 = d3.mean(finishers, d => d.actualT2Time || 0);
+            const avgRun = d3.mean(finishers, d => d.actualRunTime || 0);
+            
+            const t1Boost = avgT1 * 4;
+            const t2Boost = avgT2 * 4;
+            const totalBoost = t1Boost + t2Boost;
+            
+            const swimProp = avgSwim / (avgSwim + avgBike + avgRun);
+            const bikeProp = avgBike / (avgSwim + avgBike + avgRun);
+            const runProp = avgRun / (avgSwim + avgBike + avgRun);
+            
+            const adjustedSwim = avgSwim - (totalBoost * swimProp);
+            const adjustedBike = avgBike - (totalBoost * bikeProp);
+            const adjustedRun = avgRun - (totalBoost * runProp);
+            const adjustedT1 = avgT1 * 5;
+            const adjustedT2 = avgT2 * 5;
+            
+            const adjustedTotal = adjustedSwim + adjustedT1 + adjustedBike + adjustedT2 + adjustedRun;
+            
+            const swimEnd = adjustedSwim / adjustedTotal;
+            const t1End = (adjustedSwim + adjustedT1) / adjustedTotal;
+            const bikeEnd = (adjustedSwim + adjustedT1 + adjustedBike) / adjustedTotal;
+            const t2End = (adjustedSwim + adjustedT1 + adjustedBike + adjustedT2) / adjustedTotal;
+            
+            const stages = [
+                {name: "Start", key: "swimRank", position: 0},
+                {name: "Swim", key: "swimRank", position: swimEnd},
+                {name: "T1", key: "t1Rank", position: t1End},
+                {name: "Bike", key: "bikeRank", position: bikeEnd},
+                {name: "T2", key: "t2Rank", position: t2End},
+                {name: "Finish", key: "finalRank", position: 1}
+            ];
+            
+            const xScale = d3.scaleLinear()
+                .domain([0, 1])
+                .range([0, width]);
+            
+            // Adjust yScale to handle all athletes including DNF/DSQ/LAP/DNS with extra space for DSQ
+            const dsqCount = dsqAthletes.length;
+            const totalPositions = data.length + dsqCount; // Extra space for DSQ athletes at the end
+            const yScale = d3.scaleLinear()
+                .domain([1, totalPositions + 1])
+                .range([0, height]);
+            
+            svg.append("g")
+                .attr("class", "grid")
+                .attr("transform", `translate(0,${height})`)
+                .call(d3.axisBottom(xScale)
+                    .tickValues(stages.map(s => s.position))
+                    .tickSize(-height)
+                    .tickFormat("")
+                );
+            
+            const xAxis = svg.append("g")
+                .attr("transform", `translate(0,${height})`);
+            
+            xAxis.call(d3.axisBottom(xScale)
+                .tickValues(stages.map(s => s.position))
+                .tickFormat("")
+            );
+            
+            xAxis.append("text")
+                .attr("x", xScale(swimEnd / 2))
+                .attr("y", 30)
+                .style("text-anchor", "middle")
+                .style("font-size", "12px")
+                .style("fill", "black")
+                .text("Swim");
+            
+            xAxis.append("text")
+                .attr("x", xScale((swimEnd + t1End) / 2))
+                .attr("y", 30)
+                .style("text-anchor", "middle")
+                .style("font-size", "12px")
+                .style("fill", "black")
+                .text("T1");
+            
+            xAxis.append("text")
+                .attr("x", xScale((t1End + bikeEnd) / 2))
+                .attr("y", 30)
+                .style("text-anchor", "middle")
+                .style("font-size", "12px")
+                .style("fill", "black")
+                .text("Bike");
+            
+            xAxis.append("text")
+                .attr("x", xScale((bikeEnd + t2End) / 2))
+                .attr("y", 30)
+                .style("text-anchor", "middle")
+                .style("font-size", "12px")
+                .style("fill", "black")
+                .text("T2");
+            
+            xAxis.append("text")
+                .attr("x", xScale((t2End + 1) / 2))
+                .attr("y", 30)
+                .style("text-anchor", "middle")
+                .style("font-size", "12px")
+                .style("fill", "black")
+                .text("Run");
+            
+            svg.append("g")
+                .call(d3.axisLeft(yScale));
+            
+            svg.append("text")
+                .attr("transform", "rotate(-90)")
+                .attr("y", 0 - margin.left)
+                .attr("x", 0 - (height / 2))
+                .attr("dy", "1em")
+                .style("text-anchor", "middle")
+                .style("font-size", "14px")
+                .style("font-weight", "600")
+                .text("Position");
+            
+            // Calculate positions for all athletes including DNF/DSQ
+            let dnfPosition = Math.max(...data.filter(a => a.finalRank).map(a => a.finalRank || 0)) + 1;
+            const athletePositions = {};
+            
+            data.forEach((athlete, index) => {
+                if (athlete.finalRank) {
+                    athletePositions[athlete.name] = athlete.finalRank;
+                } else if (athlete.status === 'DSQ') {
+                    // DSQ athletes will be placed at the end
+                    const dsqIndex = dsqAthletes.indexOf(athlete);
+                    athletePositions[athlete.name] = nonDsqData.length + dsqIndex + 1;
+                } else {
+                    // DNF, LAP, DNS get positions after finishers
+                    athletePositions[athlete.name] = dnfPosition++;
+                }
+            });
+            
+            data.forEach((athlete, athleteIndex) => {
+                // Calculate display positions for each stage
+                const finalPosition = athletePositions[athlete.name];
+                const lineData = stages.map(stage => {
+                    let rank;
+                    if (stage.key === 'finalRank') {
+                        rank = finalPosition;
+                    } else {
+                        rank = athlete[stage.key] || finalPosition;
+                    }
+                    return { x: stage.position, y: rank };
+                });
+                
+                const athleteGroup = svg.append("g")
+                    .attr("class", `athlete-group-${athleteIndex}`);
+                
+                // Determine line style based on status
+                let strokeDasharray = "";
+                if (athlete.status === 'DSQ') {
+                    strokeDasharray = "3,3"; // Dotted line for DSQ
+                } else if (athlete.status === 'DNF' || athlete.status === 'LAP') {
+                    strokeDasharray = "8,4"; // Dashed line for DNF/LAP
+                } else if (athlete.status === 'DNS') {
+                    strokeDasharray = "8,4"; // Dashed line for DNS
+                }
+                
+                for (let i = 0; i < lineData.length - 1; i++) {
+                    athleteGroup.append("line")
+                        .attr("class", "athlete-line")
+                        .attr("x1", xScale(lineData[i].x))
+                        .attr("y1", yScale(lineData[i].y))
+                        .attr("x2", xScale(lineData[i + 1].x))
+                        .attr("y2", yScale(lineData[i + 1].y))
+                        .attr("stroke", colorScale(athlete.name))
+                        .attr("stroke-width", 1.5)  // Reduced from 2 to 1.5
+                        .attr("stroke-dasharray", strokeDasharray)
+                        .attr("opacity", 0.4);  // Reduced from 0.7 to 0.4
+                }
+                
+                athleteGroup.on("mouseover", function(event) {
+                    d3.select(this).selectAll(".athlete-line")
+                        .attr("stroke-width", 3)  // Reduced from 4 to 3 for hover
+                        .attr("opacity", 1);  // Full opacity on hover
+                    
+                    // Position tooltip on the right side
+                    const tooltip = d3.select("#tooltip");
+                    tooltip.transition().duration(200).style("opacity", .9);
+                    
+                    // Calculate finish time
+                    const finishTime = (athlete.actualSwimTime || 0) + (athlete.actualT1Time || 0) + 
+                                     (athlete.actualBikeTime || 0) + (athlete.actualT2Time || 0) + 
+                                     (athlete.actualRunTime || 0);
+                    
+                    // Get time behind leader (assuming first athlete is leader)
+                    const leaderTime = raceData.filter(d => d.finalRank === 1)[0];
+                    const leaderFinishTime = leaderTime ? 
+                        (leaderTime.actualSwimTime || 0) + (leaderTime.actualT1Time || 0) + 
+                        (leaderTime.actualBikeTime || 0) + (leaderTime.actualT2Time || 0) + 
+                        (leaderTime.actualRunTime || 0) : finishTime;
+                    const timeBehind = finishTime - leaderFinishTime;
+                    
+                    const athleteName = athlete.baseName || athlete.name.replace(/ \([^)]*\)$/, '');
+                    
+                    tooltip.html(`
+                        <strong>${athleteName} ${athlete.country}</strong><br/>
+                        ${athlete.status === 'OK' ? `Finish Time: ${secondsToTime(finishTime)}` : `Status: ${athlete.status}`}<br/>
+                        ${athlete.status === 'OK' && timeBehind > 0 ? `Behind Leader: ${secondsToTime(timeBehind)}` : ''}
+                        ${athlete.status === 'OK' && timeBehind === 0 ? 'Race Leader' : ''}
+                    `)
+                    .style("left", (window.innerWidth - 250) + "px")  // Position on right
+                    .style("top", (event.pageY - 28) + "px");
+                })
+                .on("mouseout", function() {
+                    d3.select(this).selectAll(".athlete-line")
+                        .attr("stroke-width", 1.5)  // Back to thin
+                        .attr("opacity", 0.4);  // Back to low opacity
+                    
+                    d3.select("#tooltip").transition()
+                        .duration(500)
+                        .style("opacity", 0);
+                });
+                
+                // Removed stage dots - cleaner visualization without them
+            });
+            
+            // Display athlete names with country and position/status in parentheses
+            // Track position offset for non-finishers
+            let nonFinisherPosition = Math.max(...nonDsqData.filter(a => a.finalRank).map(a => a.finalRank || 0)) + 1;
+            
+            // First display non-DSQ athletes
+            nonDsqData.forEach((athlete, index) => {
+                let displayY;
+                if (athlete.finalRank) {
+                    displayY = yScale(athlete.finalRank);
+                } else {
+                    // DNF, LAP, DNS athletes go after finishers
+                    displayY = yScale(nonFinisherPosition++);
+                }
+                let displayText = '';
+                
+                // Format: Name Country (position/status)
+                const baseName = athlete.baseName || athlete.name.replace(/ \([^)]*\)$/, '');
+                if (athlete.finalRank) {
+                    // Removed DSQ position check and ** marking - DSQ athletes shown at bottom
+                    displayText = `${athlete.finalRank}. ${baseName} ${athlete.country} (${athlete.finalRank})`;
+                } else if (athlete.status) {
+                    displayText = `${baseName} ${athlete.country} (${athlete.status})`;
+                }
+                
+                const text = svg.append("text")
+                    .attr("x", width + 10)
+                    .attr("y", displayY)
+                    .attr("dy", "0.35em")
+                    .style("font-size", "10px")
+                    .style("fill", colorScale(athlete.name))
+                    .text(displayText);
+                    
+                // Removed DSQ indicator code - DSQ athletes shown separately at bottom
+            });
+            
+            // Display DSQ athletes at the bottom after all others
+            dsqAthletes.forEach((athlete, index) => {
+                const baseName = athlete.baseName || athlete.name.replace(/ \([^)]*\)$/, '');
+                const displayText = `${baseName} ${athlete.country} (DSQ)`;  // Removed ** prefix
+                const displayY = yScale(nonFinisherPosition + index);
+                
+                svg.append("text")
+                    .attr("x", width + 10)
+                    .attr("y", displayY)
+                    .attr("dy", "0.35em")
+                    .style("font-size", "10px")
+                    .style("fill", colorScale(athlete.name))
+                    .text(displayText);
+            });
+        }
+
+        function drawDevelopmentChart(data) {
+            d3.select("#developmentChart").selectAll("*").remove();
+            d3.select("#developmentLegend").selectAll("*").remove();
+            // Filter to only include finishers and athletes who started (exclude DNS)
+            const racers = data.filter(a => a.status !== 'DNS');
+            const margin = {top: 40, right: 150, bottom: 60, left: 100};
+            chartWidth = Math.min(1200, window.innerWidth - 100) - margin.left - margin.right;
+            chartHeight = 500 - margin.top - margin.bottom;
+            developmentSvg = d3.select("#developmentChart")
+                            .append("svg")
+                            .attr("width", chartWidth + margin.left + margin.right)
+                            .attr("height", chartHeight + margin.top + margin.bottom);
+            // Add clipping path
+            developmentSvg.append("defs")
+                            .append("clipPath")
+                            .attr("id", "chart-clip")
+                            .append("rect")
+                            .attr("x", 0)
+                            .attr("y", 0)
+                            .attr("width", chartWidth)
+                            .attr("height", chartHeight);
+            developmentG = developmentSvg.append("g")
+                            .attr("transform", `translate(${margin.left},${margin.top})`);
+            // Calculate averages only from finishers for proper scaling
+            const finishers = racers.filter(a => !['DNF', 'DSQ', 'LAP'].includes(a.status));
+            const avgSwim = d3.mean(finishers, d => d.actualSwimTime || 0);
+            const avgT1 = d3.mean(finishers, d => d.actualT1Time || 0);
+            const avgBike = d3.mean(finishers, d => d.actualBikeTime || 0);
+            const avgT2 = d3.mean(finishers, d => d.actualT2Time || 0);
+            const avgRun = d3.mean(finishers, d => d.actualRunTime || 0);
+            const totalAvg = avgSwim + avgT1 + avgBike + avgT2 + avgRun;
+            const swimDist = (avgSwim / totalAvg) * 100;
+            const t1Dist = swimDist + (avgT1 / totalAvg) * 100;
+            const bikeDist = t1Dist + (avgBike / totalAvg) * 100;
+            const t2Dist = bikeDist + (avgT2 / totalAvg) * 100;
+            // Store distances globally
+            stageDist = {
+                swim: swimDist,
+                t1: t1Dist,
+                bike: bikeDist,
+                t2: t2Dist
+            };
+            // Define section bounds with true 20x horizontal zoom for transitions
+            const t1Width = t1Dist - swimDist;
+            const t2Width = t2Dist - bikeDist;
+            const t1Center = swimDist + t1Width / 2;
+            const t2Center = bikeDist + t2Width / 2;
+            // For 20x zoom, visible width should be 1/20th of normal (5% of full race)
+            const zoomWidth = 5; // 5% of race distance for 20x zoom
+            sectionBounds = {
+                'all': { start: 0, end: 100, type: 'all' },
+                'swim': { start: 0, end: t1Dist, type: 'swim' }, // Show swim and T1
+                't1': { start: Math.max(0, t1Center - zoomWidth/2), end: Math.min(100, t1Center + zoomWidth/2), type: 'transition' }, // True 20x zoom on T1
+                'bike': { start: t1Dist, end: t2Dist, type: 'bike' }, // Show bike segment
+                't2': { start: Math.max(0, t2Center - zoomWidth/2), end: Math.min(100, t2Center + zoomWidth/2), type: 'transition' }, // True 20x zoom on T2
+                'run': { start: bikeDist, end: 100, type: 'run' } // Show T2 and run
+            };
+            // Find the leader (first finisher)
+            const leader = finishers[0];
+            developmentChartData = racers.map(athlete => {
+                const values = [{stage: "Start", distance: 0, timeBehind: 0, cumTime: 0}];
+                // Add stages based on what the athlete completed
+                if (athlete.actualSwimTime) {
+                    values.push({
+                        stage: "Swim",
+                        distance: swimDist,
+                        timeBehind: athlete.swimCumulative - leader.swimCumulative,
+                        cumTime: athlete.swimCumulative
+                    });
+                }
+                if (athlete.actualT1Time) {
+                    values.push({
+                        stage: "T1",
+                        distance: t1Dist,
+                        timeBehind: athlete.t1Cumulative - leader.t1Cumulative,
+                        cumTime: athlete.t1Cumulative
+                    });
+                }
+                if (athlete.actualBikeTime) {
+                    values.push({
+                        stage: "Bike",
+                        distance: bikeDist,
+                        timeBehind: athlete.bikeCumulative - leader.bikeCumulative,
+                        cumTime: athlete.bikeCumulative
+                    });
+                }
+                if (athlete.actualT2Time) {
+                    values.push({
+                        stage: "T2",
+                        distance: t2Dist,
+                        timeBehind: athlete.t2Cumulative - leader.t2Cumulative,
+                        cumTime: athlete.t2Cumulative
+                    });
+                }
+                if (athlete.actualRunTime) {
+                    values.push({
+                        stage: "Finish",
+                        distance: 100,
+                        timeBehind: athlete.totalCumulative - leader.totalCumulative,
+                        cumTime: athlete.totalCumulative
+                    });
+                }
+                return {
+                    name: athlete.name,
+                    country: athlete.country,
+                    athleteIndex: racers.indexOf(athlete),
+                    athlete: athlete,
+                    status: athlete.status,
+                    values: values
+                };
+            });
+            const maxTimeBehind = d3.max(developmentChartData, d => d3.max(d.values, v => v.timeBehind));
+            originalXScale = d3.scaleLinear()
+                            .domain([0, 100])
+                            .range([0, chartWidth]);
+            originalYScale = d3.scaleLinear()
+                            .domain([-maxTimeBehind - 10, 10])
+                            .range([chartHeight, 0]);
+            currentXScale = originalXScale.copy();
+            currentYScale = originalYScale.copy();
+            // Set up line generator
+            lineGenerator = d3.line()
+                            .x(d => currentXScale(d.distance))
+                            .y(d => currentYScale(-d.timeBehind))
+                            .curve(d3.curveLinear);
+            developmentG.append("g")
+                            .attr("class", "grid grid-x")
+                            .attr("transform", `translate(0,${chartHeight})`)
+                            .call(d3.axisBottom(currentXScale)
+                                .tickSize(-chartHeight)
+                                .tickFormat("")
+                            );
+            developmentG.append("g")
+                            .attr("class", "grid grid-y")
+                            .call(d3.axisLeft(currentYScale)
+                                .tickSize(-chartWidth)
+                                .tickFormat("")
+                            );
+            const xAxis = developmentG.append("g")
+                            .attr("class", "x-axis")
+                            .attr("transform", `translate(0,${chartHeight})`);
+            xAxis.call(d3.axisBottom(currentXScale)
+                            .tickValues([0, swimDist, t1Dist, bikeDist, t2Dist, 100])
+                            .tickFormat("")
+                        );
+            // Add x-axis labels
+            const xLabels = xAxis.append("g").attr("class", "x-labels");
+            xLabels.append("text")
+                            .attr("class", "x-label-swim")
+                            .attr("x", currentXScale(swimDist / 2))
+                            .attr("y", 30)
+                            .style("text-anchor", "middle")
+                            .style("font-size", "12px")
+                            .style("fill", "black")
+                            .text("Swim");
+            xLabels.append("text")
+                            .attr("class", "x-label-t1")
+                            .attr("x", currentXScale((swimDist + t1Dist) / 2))
+                            .attr("y", 30)
+                            .style("text-anchor", "middle")
+                            .style("font-size", "12px")
+                            .style("fill", "black")
+                            .text("T1");
+            xLabels.append("text")
+                            .attr("class", "x-label-bike")
+                            .attr("x", currentXScale((t1Dist + bikeDist) / 2))
+                            .attr("y", 30)
+                            .style("text-anchor", "middle")
+                            .style("font-size", "12px")
+                            .style("fill", "black")
+                            .text("Bike");
+            xLabels.append("text")
+                            .attr("class", "x-label-t2")
+                            .attr("x", currentXScale((bikeDist + t2Dist) / 2))
+                            .attr("y", 30)
+                            .style("text-anchor", "middle")
+                            .style("font-size", "12px")
+                            .style("fill", "black")
+                            .text("T2");
+            xLabels.append("text")
+                            .attr("class", "x-label-run")
+                            .attr("x", currentXScale((t2Dist + 100) / 2))
+                            .attr("y", 30)
+                            .style("text-anchor", "middle")
+                            .style("font-size", "12px")
+                            .style("fill", "black")
+                            .text("Run");
+            developmentG.append("g")
+                            .attr("class", "y-axis")
+                            .call(d3.axisLeft(currentYScale)
+                                .tickFormat(d => {
+                                    const absD = Math.abs(d);
+                                    return (d >= 0 ? '+' : '-') + secondsToTime(absD);
+                                })
+                            );
+            developmentG.append("text")
+                            .attr("class", "x-axis-label")
+                            .attr("transform", `translate(${chartWidth/2}, ${chartHeight + margin.bottom - 10})`)
+                            .style("text-anchor", "middle")
+                            .style("font-size", "14px")
+                            .style("font-weight", "600")
+                            .text("Race Progress");
+            developmentG.append("text")
+                            .attr("transform", "rotate(-90)")
+                            .attr("y", 0 - margin.left + 20)
+                            .attr("x", 0 - (chartHeight / 2))
+                            .attr("dy", "1em")
+                            .style("text-anchor", "middle")
+                            .style("font-size", "14px")
+                            .style("font-weight", "600")
+                            .text("Time Behind Leader");
+            const chartContent = developmentG.append("g")
+                            .attr("class", "chart-content")
+                            .attr("clip-path", "url(#chart-clip)");
+            // Removed segment labels container - data now shown in tooltips
+            developmentChartData.forEach((athlete, index) => {
+                // Determine line style based on status
+                let strokeDasharray = "";
+                if (athlete.status === 'DSQ') {
+                    strokeDasharray = "3,3"; // Dotted line for DSQ
+                } else if (athlete.status === 'DNF' || athlete.status === 'LAP') {
+                    strokeDasharray = "8,4"; // Dashed line for DNF/LAP
+                }
+                // Draw path for each athlete
+                const path = chartContent.append("path")
+                                    .datum(athlete.values) // Bind the data
+                                    .attr("class", `athlete-path athlete-path-${athlete.athleteIndex}`)
+                                    .attr("d", lineGenerator)
+                                    .attr("fill", "none")
+                                    .attr("stroke", colorScale(athlete.name))
+                                    .attr("stroke-width", 1.5)
+                                    .attr("stroke-dasharray", strokeDasharray)
+                                    .attr("opacity", 0.4)
+                                    .on("mouseover", function(event) {
+                                        d3.select(this)
+                                            .attr("stroke-width", 3)
+                                            .attr("opacity", 1);
+                                        d3.selectAll(`.athlete-circle-${athlete.athleteIndex}`)
+                                            .attr("r", 5)
+                                            .attr("opacity", 1);
+                                        // Show tooltip on the right side
+                                        const tooltip = d3.select("#tooltip");
+                                        tooltip.transition().duration(200).style("opacity", .9);
+                                        const athleteName = athlete.athlete.baseName || athlete.name.replace(/ \([^)]*\)$/, '');
+                                        const finishTime = athlete.athlete.actualSwimTime + athlete.athlete.actualT1Time +
+                                            athlete.athlete.actualBikeTime + athlete.athlete.actualT2Time +
+                                            athlete.athlete.actualRunTime;
+                                        const timeDiff = Math.abs(athlete.values[athlete.values.length - 1].timeBehind);
+                                        tooltip.html(`
+                                            <strong>${athleteName} ${athlete.athlete.country}</strong><br/>
+                                            Finish Time: ${secondsToTime(finishTime)}<br/>
+                                            ${timeDiff > 0 ? `Behind Leader: ${secondsToTime(timeDiff)}` : 'Race Leader'}
+                                        `)
+                                        .style("left", (window.innerWidth - 250) + "px") // Position on right
+                                        .style("top", (event.pageY - 28) + "px");
+                                    })
+                                    .on("mouseout", function() {
+                                        d3.select(this)
+                                            .attr("stroke-width", 1.5)
+                                            .attr("opacity", 0.4);
+                                        d3.selectAll(`.athlete-circle-${athlete.athleteIndex}`)
+                                            .attr("r", 4)
+                                            .attr("opacity", 0.8);
+                                        d3.select("#tooltip").transition()
+                                            .duration(500)
+                                            .style("opacity", 0);
+                                    });
+                athlete.values.forEach((point, i) => {
+                    chartContent.append("circle")
+                                    .attr("class", `athlete-circle athlete-circle-${athlete.athleteIndex}`)
+                                    .attr("data-x", point.distance)
+                                    .attr("data-y", -point.timeBehind)
+                                    .attr("data-stage", point.stage)
+                                    .attr("cx", currentXScale(point.distance))
+                                    .attr("cy", currentYScale(-point.timeBehind))
+                                    .attr("r", 4)
+                                    .attr("fill", colorScale(athlete.name))
+                                    .attr("opacity", 0.8)
+                                    .style("cursor", "pointer")
+                                    .on("mouseover", function(event) {
+                                        // Highlight the athlete's path when hovering on a circle
+                                        d3.selectAll(`.athlete-path-${athlete.athleteIndex}`)
+                                            .attr("stroke-width", 3)
+                                            .attr("opacity", 1);
+                                        d3.select(this).attr("r", 6);
+                                        const tooltip = d3.select("#tooltip");
+                                        tooltip.transition().duration(200).style("opacity", .9);
+                                        // Build tooltip content based on current view and segment
+                                        const athleteName = athlete.athlete.baseName || athlete.name.replace(/ \([^)]*\)$/, '');
+                                        let tooltipContent = `<strong>${athleteName} ${athlete.athlete.country}</strong><br/>`;
+                                        // Show segment-specific data based on current view
+                                        if (currentSection === 'all') {
+                                            // For 'all' view, don't show segment data
+                                            tooltipContent += `${point.stage}: ${secondsToTime(point.cumTime)}<br/>`;
+                                            tooltipContent += `Overall Behind: ${secondsToTime(Math.abs(point.timeBehind))}`;
+                                        } else if (currentSection === 'swim') {
+                                            // Show swim and T1 data
+                                            if (athlete.athlete.actualSwimTime) {
+                                                tooltipContent += `Swim: ${secondsToTime(athlete.athlete.actualSwimTime)} (${athlete.athlete.swimSegmentRank || 'N/A'})<br/>`;
+                                                const swimBehind = athlete.athlete.actualSwimTime - segmentLeaders.swim.actualSwimTime;
+                                                tooltipContent += `Time difference: +${secondsToTime(swimBehind)}<br/>`;
+                                            }
+                                            if (athlete.athlete.actualT1Time) {
+                                                tooltipContent += `T1: ${secondsToTime(athlete.athlete.actualT1Time)} (${athlete.athlete.t1SegmentRank || 'N/A'})`;
+                                            }
+                                        } else if (currentSection === 't1' || currentSection === 't2') {
+                                            // Show transition times with 20x zoom
+                                            const transTime = currentSection === 't1' ? athlete.athlete.actualT1Time : athlete.athlete.actualT2Time;
+                                            const transRank = currentSection === 't1' ? athlete.athlete.t1SegmentRank : athlete.athlete.t2SegmentRank;
+                                            if (transTime) {
+                                                tooltipContent += `${currentSection.toUpperCase()}: ${secondsToTime(transTime)} (${transRank || 'N/A'})<br/>`;
+                                                const leader = currentSection === 't1' ? segmentLeaders.t1 : segmentLeaders.t2;
+                                                const leaderTime = currentSection === 't1' ? leader.actualT1Time : leader.actualT2Time;
+                                                const behind = transTime - leaderTime;
+                                                tooltipContent += `Time difference: +${secondsToTime(behind)}`;
+                                            }
+                                        } else if (currentSection === 'bike') {
+                                            // Show bike data
+                                            if (athlete.athlete.actualBikeTime) {
+                                                tooltipContent += `Bike: ${secondsToTime(athlete.athlete.actualBikeTime)} (${athlete.athlete.bikeSegmentRank || 'N/A'})<br/>`;
+                                                const bikeBehind = athlete.athlete.actualBikeTime - segmentLeaders.bike.actualBikeTime;
+                                                tooltipContent += `Time difference: +${secondsToTime(bikeBehind)}`;
+                                            }
+                                        } else if (currentSection === 'run') {
+                                            // Show T2 and run data
+                                            if (athlete.athlete.actualT2Time) {
+                                                tooltipContent += `T2: ${secondsToTime(athlete.athlete.actualT2Time)} (${athlete.athlete.t2SegmentRank || 'N/A'})<br/>`;
+                                            }
+                                            if (athlete.athlete.actualRunTime) {
+                                                tooltipContent += `Run: ${secondsToTime(athlete.athlete.actualRunTime)} (${athlete.athlete.runSegmentRank || 'N/A'})<br/>`;
+                                                const runBehind = athlete.athlete.actualRunTime - segmentLeaders.run.actualRunTime;
+                                                tooltipContent += `Time difference: +${secondsToTime(runBehind)}`;
+                                            }
+                                        }
+                                        // Show the last completed segment data for each dot
+                                        if (point.stage !== 'Start') {
+                                            let segmentTime, segmentRank, segmentBehind;
+                                            if (point.stage === 'Swim' && athlete.athlete.actualSwimTime) {
+                                                segmentTime = athlete.athlete.actualSwimTime;
+                                                segmentRank = athlete.athlete.swimSegmentRank;
+                                                segmentBehind = segmentTime - segmentLeaders.swim.actualSwimTime;
+                                            } else if (point.stage === 'T1' && athlete.athlete.actualT1Time) {
+                                                segmentTime = athlete.athlete.actualT1Time;
+                                                segmentRank = athlete.athlete.t1SegmentRank;
+                                                segmentBehind = segmentTime - segmentLeaders.t1.actualT1Time;
+                                            } else if (point.stage === 'Bike' && athlete.athlete.actualBikeTime) {
+                                                segmentTime = athlete.athlete.actualBikeTime;
+                                                segmentRank = athlete.athlete.bikeSegmentRank;
+                                                segmentBehind = segmentTime - segmentLeaders.bike.actualBikeTime;
+                                            } else if (point.stage === 'T2' && athlete.athlete.actualT2Time) {
+                                                segmentTime = athlete.athlete.actualT2Time;
+                                                segmentRank = athlete.athlete.t2SegmentRank;
+                                                segmentBehind = segmentTime - segmentLeaders.t2.actualT2Time;
+                                            } else if (point.stage === 'Finish' && athlete.athlete.actualRunTime) {
+                                                segmentTime = athlete.athlete.actualRunTime;
+                                                segmentRank = athlete.athlete.runSegmentRank;
+                                                segmentBehind = segmentTime - segmentLeaders.run.actualRunTime;
+                                            }
+                                            if (segmentTime) {
+                                                const athleteName = athlete.athlete.baseName || athlete.name.replace(/ \([^)]*\)$/, '');
+                                                tooltipContent = `<strong>${athleteName} ${athlete.athlete.country}</strong><br/>`;
+                                                tooltipContent += `${point.stage === 'Finish' ? 'Run' : point.stage} time: ${secondsToTime(segmentTime)} (${segmentRank || 'N/A'})<br/>`;
+                                                tooltipContent += `Time difference: ${segmentBehind === 0 ? 'Leader' : '+' + secondsToTime(segmentBehind)}`;
+                                            }
+                                        }
+                                        tooltip.html(tooltipContent)
+                                            .style("left", (event.pageX + 10) + "px")
+                                            .style("top", (event.pageY - 28) + "px");
+                                    })
+                                    .on("mouseout", function() {
+                                        // Reset path style when mouse leaves circle
+                                        d3.selectAll(`.athlete-path-${athlete.athleteIndex}`)
+                                            .attr("stroke-width", 1.5)
+                                            .attr("opacity", 0.4);
+                                        d3.select(this).attr("r", 4);
+                                        d3.select("#tooltip").transition()
+                                            .duration(500)
+                                            .style("opacity", 0);
+                                    });
+                });
+                // Removed segment label - data now shown in tooltips
+            });
+            const legend = d3.select("#developmentLegend");
+            const controls = legend.append("div")
+                            .attr("class", "legend-controls");
+            controls.append("button")
+                            .attr("class", "btn toggle-all")
+                            .text("Hide All")
+                            .on("click", function() {
+                                const showAll = this.textContent === "Show All";
+                                this.textContent = showAll ? "Hide All" : "Show All";
+                                racers.forEach((athlete, index) => {
+                                    developmentAthleteVisibility[athlete.name] = showAll;
+                                    d3.selectAll(`.athlete-path-${index}`).classed("hidden", !showAll);
+                                    d3.selectAll(`.athlete-circle-${index}`).classed("hidden", !showAll);
+                                });
+                                d3.selectAll("#developmentLegend .legend-item").classed("hidden", !showAll);
+                                // Update country visibility
+                                const countries = [...new Set(racers.map(d => d.country))];
+                                countries.forEach(country => {
+                                    developmentCountryVisibility[country] = showAll;
+                                    d3.select(`#dev-country-${country}`).classed("hidden", !showAll);
+                                });
+                            });
+            const athleteLegend = legend.append("div")
+                            .attr("class", "athlete-legend");
+            racers.forEach((athlete, index) => {
+                const item = athleteLegend.append("div")
+                                    .attr("id", `dev-legend-item-${index}`)
+                                    .attr("class", `legend-item ${developmentAthleteVisibility[athlete.name] ? '' : 'hidden'}`)
+                                    .style("cursor", "pointer")
+                                    .on("click", function() {
+                                        developmentAthleteVisibility[athlete.name] = !developmentAthleteVisibility[athlete.name];
+                                        d3.select(this).classed("hidden", !developmentAthleteVisibility[athlete.name]);
+                                        if (developmentAthleteVisibility[athlete.name]) {
+                                            d3.selectAll(`.athlete-path-${index}`).classed("hidden", false);
+                                            d3.selectAll(`.athlete-circle-${index}`).classed("hidden", false);
+                                        } else {
+                                            d3.selectAll(`.athlete-path-${index}`).classed("hidden", true);
+                                            d3.selectAll(`.athlete-circle-${index}`).classed("hidden", true);
+                                        }
+                                    });
+                item.append("div")
+                                .attr("class", "legend-color")
+                                .style("background-color", colorScale(athlete.name));
+                item.append("div")
+                                .attr("class", "legend-text")
+                                .text(() => {
+                                    const athleteName = athlete.baseName || athlete.name.replace(/ \([^)]*\)$/, '');
+                                    if (athlete.finalRank) {
+                                        return `${athlete.finalRank}. ${athleteName} ${athlete.country}`;
+                                    } else if (athlete.status) {
+                                        return `${athleteName} ${athlete.country} (${athlete.status})`;
+                                    }
+                                    return `${athleteName} ${athlete.country}`;
+                                });
+            });
+            const countries = [...new Set(racers.map(d => d.country))].sort();
+            const countryLegend = legend.append("div")
+                            .attr("class", "country-legend");
+            countries.forEach(country => {
+                const countryItem = countryLegend.append("div")
+                                    .attr("id", `dev-country-${country}`)
+                                    .attr("class", `country-item ${developmentCountryVisibility[country] ? '' : 'hidden'}`)
+                                    .on("click", function() {
+                                        developmentCountryVisibility[country] = !developmentCountryVisibility[country];
+                                        d3.select(this).classed("hidden", !developmentCountryVisibility[country]);
+                                        racers.forEach((athlete, index) => {
+                                            if (athlete.country === country) {
+                                                const isVisible = developmentCountryVisibility[country];
+                                                developmentAthleteVisibility[athlete.name] = isVisible;
+                                                d3.selectAll(`.athlete-path-${index}`).classed("hidden", !isVisible);
+                                                d3.selectAll(`.athlete-circle-${index}`).classed("hidden", !isVisible);
+                                                d3.select(`#dev-legend-item-${index}`).classed("hidden", !isVisible);
+                                            }
+                                        });
+                                    });
+                countryItem.append("span")
+                                    .attr("class", "country-flag")
+                                    .text(countryFlags[country] || '🏴');
+                countryItem.append("span")
+                                    .text(country);
+            });
+
+            // Label position updater
+            function updateLabelPositions() {
+                developmentG.select(".x-label-swim").attr("x", currentXScale(swimDist / 2));
+                developmentG.select(".x-label-t1").attr("x", currentXScale((swimDist + t1Dist) / 2));
+                developmentG.select(".x-label-bike").attr("x", currentXScale((t1Dist + bikeDist) / 2));
+                developmentG.select(".x-label-t2").attr("x", currentXScale((bikeDist + t2Dist) / 2));
+                developmentG.select(".x-label-run").attr("x", currentXScale((t2Dist + 100) / 2));
+            }
+
+            // Custom horizontal zoom variables
+            let isZooming = false;
+            let zoomStartX;
+            let zoomRect;
+
+            // Enable custom horizontal zoom (for t1/t2 sections)
+            function enableCustomZoom() {
+                if (isZooming) return;
+                // Remove existing
+                developmentG.selectAll(".zoom-overlay").remove();
+                developmentG.selectAll(".zoom-selection").remove();
+                const zoomOverlay = developmentG.append("rect")
+                    .attr("class", "zoom-overlay")
+                    .attr("width", chartWidth)
+                    .attr("height", chartHeight)
+                    .style("fill", "none")
+                    .style("pointer-events", "all")
+                    .style("cursor", "crosshair");
+                // Mouse down - start horizontal zoom selection
+                zoomOverlay.on("mousedown", function(event) {
+                    const [x] = d3.pointer(event, this);
+                    isZooming = true;
+                    zoomStartX = x;
+                    developmentG.selectAll(".zoom-selection").remove();
+                    zoomRect = developmentG.append("rect")
+                        .attr("class", "zoom-selection")
+                        .attr("y", 0)
+                        .attr("height", chartHeight)
+                        .attr("x", x)
+                        .attr("width", 0)
+                        .style("fill", "rgba(100, 100, 200, 0.2)")
+                        .style("stroke", "rgba(100, 100, 200, 0.8)")
+                        .style("stroke-width", 1)
+                        .style("stroke-dasharray", "3,3");
+                });
+                // Mouse move - update selection (horizontal only)
+                d3.select(window).on("mousemove.customzoom", function(event) {
+                    if (!isZooming) return;
+                    const [x] = d3.pointer(event, developmentG.node());
+                    const clampedX = Math.max(0, Math.min(chartWidth, x));
+                    const width = Math.abs(clampedX - zoomStartX);
+                    const xPos = Math.min(clampedX, zoomStartX);
+                    zoomRect
+                        .attr("x", xPos)
+                        .attr("width", width);
+                });
+                // Mouse up - apply x zoom
+                d3.select(window).on("mouseup.customzoom", function(event) {
+                    if (!isZooming) return;
+                    const [endX] = d3.pointer(event, developmentG.node());
+                    const clampedEndX = Math.max(0, Math.min(chartWidth, endX));
+                    if (Math.abs(clampedEndX - zoomStartX) > 5) { // Minimum selection width
+                        const x1 = Math.min(zoomStartX, clampedEndX);
+                        const x2 = Math.max(zoomStartX, clampedEndX);
+                        const newStart = currentXScale.invert(x1);
+                        const newEnd = currentXScale.invert(x2);
+                        currentXScale.domain([newStart, newEnd]);
+                        // Instant update
+                        instantUpdate();
+                    }
+                    // Clean up
+                    developmentG.selectAll(".zoom-selection").remove();
+                    isZooming = false;
+                    zoomRect = null;
+                });
+            }
+
+            // Disable custom zoom
+            function disableCustomZoom() {
+                isZooming = false;
+                developmentG.selectAll(".zoom-overlay").remove();
+                developmentG.selectAll(".zoom-selection").remove();
+                d3.select(window).on("mousemove.customzoom", null);
+                d3.select(window).on("mouseup.customzoom", null);
+            }
+
+            // Instant update for zoom (no transitions)
+            function instantUpdate() {
+                lineGenerator
+                    .x(d => currentXScale(d.distance))
+                    .y(d => currentYScale(-d.timeBehind));
+                developmentG.selectAll(".athlete-path").attr("d", lineGenerator);
+                developmentG.selectAll(".athlete-circle")
+                    .attr("cx", function() {
+                        const x = parseFloat(d3.select(this).attr("data-x"));
+                        return currentXScale(x);
+                    })
+                    .attr("cy", function() {
+                        const y = parseFloat(d3.select(this).attr("data-y"));
+                        return currentYScale(y);
+                    });
+                // Update axes (no tickValues for zoomed subviews)
+                developmentG.select(".x-axis")
+                    .call(d3.axisBottom(currentXScale).tickFormat(""));
+                developmentG.select(".y-axis")
+                    .call(d3.axisLeft(currentYScale)
+                        .tickFormat(d => {
+                            const absD = Math.abs(d);
+                            return (d >= 0 ? '+' : '-') + secondsToTime(absD);
+                        })
+                    );
+                // Update grids
+                developmentG.select(".grid-x")
+                    .call(d3.axisBottom(currentXScale).tickSize(-chartHeight).tickFormat(""));
+                developmentG.select(".grid-y")
+                    .call(d3.axisLeft(currentYScale).tickSize(-chartWidth).tickFormat(""));
+                // Update labels if in 'all' view (though unlikely during zoom)
+                if (currentSection === 'all') {
+                    updateLabelPositions();
+                }
+            }
+        }
+
+
+        function updateDevelopmentChart() {
+            if (!currentXScale || !currentYScale || !developmentChartData) return;
+            
+            // Skip bounds update if in zoom mode (keep current zoom)
+            if (currentSection !== 'zoom') {
+                const bounds = sectionBounds[currentSection];
+                if (!bounds) return;
+                
+                // Update x domain based on section
+                currentXScale.domain([bounds.start, bounds.end]);
+            
+                // Calculate y domain based on visible data
+                let relevantData = [];
+                developmentChartData.forEach(athlete => {
+                    athlete.values.forEach(point => {
+                        if (point.distance >= bounds.start && point.distance <= bounds.end) {
+                            relevantData.push(point.timeBehind);
+                    }
+                });
+            });
+            
+                const minTime = d3.min(relevantData) || 0;
+                const maxTime = d3.max(relevantData) || 0;
+                currentYScale.domain([-(maxTime + 5), Math.max(10, -minTime + 5)]);
+            }  // Close the if (currentSection !== 'zoom') block
+            
+            // Update axes
+            developmentG.select(".x-axis")
+                .transition()
+                .duration(750)
+                .call(d3.axisBottom(currentXScale)
+                    .tickFormat("")
+                );
+            
+            // Update x-axis labels based on section
+            if (currentSection === 'all') {
+                // Show all labels for full view
+                developmentG.selectAll(".x-labels text").style("display", "block");
+                developmentG.select(".x-axis-label").text("Race Progress");
+            } else if (currentSection === 'swim') {
+                // Hide all standard labels
+                developmentG.selectAll(".x-labels text").style("display", "none");
+                
+                // Add swim-specific labels
+                developmentG.select(".x-axis-label")
+                    .html(`Swim Progress - Leader: <tspan fill="${colorScale(segmentLeaders.swim.name)}">${segmentLeaders.swim.name.split(' ')[1]} (${secondsToTime(segmentLeaders.swim.swimTime)})</tspan>`);
+            } else {
+                // For other sections, hide labels
+                developmentG.selectAll(".x-labels text").style("display", "none");
+                
+                // Update axis label with section info
+                let leader, time, section;
+                switch(currentSection) {
+                    case 't1':
+                        leader = segmentLeaders.t1;
+                        time = leader.t1Time;
+                        section = 'T1';
+                        break;
+                    case 'bike':
+                        leader = segmentLeaders.bike;
+                        time = leader.bikeTime;
+                        section = 'Bike';
+                        break;
+                    case 't2':
+                        leader = segmentLeaders.t2;
+                        time = leader.t2Time;
+                        section = 'T2';
+                        break;
+                    case 'run':
+                        leader = segmentLeaders.run;
+                        time = leader.runTime;
+                        section = 'Run';
+                        break;
+                }
+                if (currentSection != 'zoom') {
+                    developmentG.select(".x-axis-label")
+                        .html(`${section} Progress - Leader: <tspan fill="${colorScale(leader.name)}">${leader.name.split(' ')[1]} (${secondsToTime(time)})</tspan>`);
+                }
+            }
+            
+            developmentG.select(".y-axis")
+                .transition()
+                .duration(750)
+                .call(d3.axisLeft(currentYScale)
+                    .tickFormat(d => {
+                        const absD = Math.abs(d);
+                        return (d >= 0 ? '+' : '-') + secondsToTime(absD);
+                    })
+                );
+            
+            // Update grids
+            developmentG.select(".grid-x")
+                .transition()
+                .duration(750)
+                .call(d3.axisBottom(currentXScale)
+                    .tickSize(-chartHeight)
+                    .tickFormat("")
+                );
+            
+            developmentG.select(".grid-y")
+                .transition()
+                .duration(750)
+                .call(d3.axisLeft(currentYScale)
+                    .tickSize(-chartWidth)
+                    .tickFormat("")
+                );
+            
+            // Update line generator with new scales
+            lineGenerator
+                .x(d => currentXScale(d.distance))
+                .y(d => currentYScale(-d.timeBehind));
+            
+            // Update paths - KEY PART!
+            developmentG.select(".chart-content").selectAll(".athlete-path")
+                .transition()
+                .duration(750)
+                .attr("d", lineGenerator);
+            
+            developmentG.select(".chart-content").selectAll(".athlete-circle")
+                .transition()
+                .duration(750)
+                .attr("cx", function() {
+                    const x = parseFloat(d3.select(this).attr("data-x"));
+                    return currentXScale(x);
+                })
+                .attr("cy", function() {
+                    const y = parseFloat(d3.select(this).attr("data-y"));
+                    return currentYScale(y);
+                });
+
+        }
+
+        function drawSpiderChart(data) {
+            d3.select("#spiderChart").selectAll("*").remove();
+            d3.select("#spiderLegend").selectAll("*").remove();
+            
+            // Use all data for normalization
+            const filteredData = data;
+            
+            const margin = {top: 60, right: 80, bottom: 60, left: 80};
+            const width = Math.min(600, window.innerWidth - 100) - margin.left - margin.right;
+            const height = 500 - margin.top - margin.bottom;
+            const radius = Math.min(width, height) / 2;
+            
+            const svg = d3.select("#spiderChart")
+                .append("svg")
+                .attr("width", width + margin.left + margin.right)
+                .attr("height", height + margin.top + margin.bottom);
+            
+            const g = svg.append("g")
+                .attr("transform", `translate(${width/2 + margin.left},${height/2 + margin.top})`);
+            
+            const axes = [
+                {axis: "Swim", key: "swimTime", rankKey: "swimSegmentRank"},
+                {axis: "T1", key: "t1Time", rankKey: "t1SegmentRank"},
+                {axis: "Bike", key: "bikeTime", rankKey: "bikeSegmentRank"},
+                {axis: "T2", key: "t2Time", rankKey: "t2SegmentRank"},
+                {axis: "Run", key: "runTime", rankKey: "runSegmentRank"}
+            ];
+            
+            // Calculate percentiles only from non-DSQ finishers who completed each segment
+            const percentiles = {};
+            axes.forEach(ax => {
+                const actualKey = ax.key.replace('Time', 'Time').replace('swim', 'actualSwim').replace('t1', 'actualT1')
+                    .replace('bike', 'actualBike').replace('t2', 'actualT2').replace('run', 'actualRun');
+                const values = filteredData
+                    .filter(d => {
+                        // Exclude DSQ athletes from normalization baseline
+                        if (d.status === 'DSQ') return false;
+                        const val = actualKey.includes('actual') ? 
+                            d[actualKey] : d[ax.key];
+                        return val && val < 99 * 3600;  // Exclude penalty times
+                    })
+                    .map(d => actualKey.includes('actual') ? d[actualKey] : d[ax.key])
+                    .sort((a, b) => a - b);
+                
+                percentiles[ax.key] = {
+                    min: values[0] || 0,
+                    max: values[values.length - 1] || 1,
+                    best: values[0] || 0,
+                    worst: values[values.length - 1] || 1
+                };
+            });
+            
+            // Allow scale to go beyond 1.0 for DSQ athletes who might be faster
+            const rScale = d3.scaleLinear()
+                .domain([0, 1.2])  // Allow up to 20% beyond the circle for DSQ athletes
+                .range([0, radius * 1.2]);
+            
+            const angleSlice = Math.PI * 2 / axes.length;
+            
+            const levels = 5;
+            for (let level = 0; level < levels; level++) {
+                g.append("circle")
+                    .attr("r", radius * ((level + 1) / levels))
+                    .style("fill", "none")
+                    .style("stroke", "#CDCDCD")
+                    .style("stroke-opacity", 0.5);
+            }
+            
+            const axis = g.selectAll(".axis")
+                .data(axes)
+                .enter()
+                .append("g")
+                .attr("class", "axis");
+            
+            axis.append("line")
+                .attr("x1", 0)
+                .attr("y1", 0)
+                .attr("x2", (d, i) => rScale(1) * Math.cos(angleSlice * i - Math.PI / 2))
+                .attr("y2", (d, i) => rScale(1) * Math.sin(angleSlice * i - Math.PI / 2))
+                .style("stroke", "#CDCDCD")
+                .style("stroke-width", "1px");
+            
+            axis.append("text")
+                .attr("class", "axis-label")
+                .style("font-size", "12px")
+                .attr("dy", "0.35em")
+                .attr("x", (d, i) => rScale(1.15) * Math.cos(angleSlice * i - Math.PI / 2))
+                .attr("y", (d, i) => rScale(1.15) * Math.sin(angleSlice * i - Math.PI / 2))
+                .style("text-anchor", "middle")
+                .text(d => d.axis);
+            
+            const radarData = filteredData.map(athlete => {
+                return {
+                    athlete: athlete,
+                    values: axes.map(ax => {
+                        // Use actual times for calculations
+                        let actualValue;
+                        if (ax.key === 'swimTime') actualValue = athlete.actualSwimTime;
+                        else if (ax.key === 't1Time') actualValue = athlete.actualT1Time;
+                        else if (ax.key === 'bikeTime') actualValue = athlete.actualBikeTime;
+                        else if (ax.key === 't2Time') actualValue = athlete.actualT2Time;
+                        else if (ax.key === 'runTime') actualValue = athlete.actualRunTime;
+                        
+                        // If athlete didn't complete this segment, return 0 for spider chart
+                        if (!actualValue || actualValue >= 99 * 3600) {
+                            return {
+                                axis: ax.axis,
+                                value: 0,  // Place at center for incomplete segments
+                                rank: null,
+                                incomplete: true
+                            };
+                        }
+                        
+                        const normalized = 1 - (actualValue - percentiles[ax.key].best) / 
+                                              (percentiles[ax.key].worst - percentiles[ax.key].best);
+                        return {
+                            axis: ax.axis,
+                            value: normalized,
+                            rank: athlete[ax.rankKey],
+                            incomplete: false
+                        };
+                    })
+                };
+            });
+            
+            const radarLine = d3.lineRadial()
+                .radius(d => rScale(d.value))
+                .angle((d, i) => i * angleSlice)
+                .curve(d3.curveLinearClosed);
+            
+            // Initialize visibility - only top 5 finishers visible by default
+            filteredData.forEach((athlete, i) => {
+                // Show only top 5 finishers by default
+                spiderAthleteVisibility[athlete.name] = athlete.finalRank && 
+                                                         athlete.finalRank <= 5 && 
+                                                         !['DNF', 'LAP', 'DSQ'].includes(athlete.status);
+            });
+            
+            filteredData.forEach((athlete, athleteIndex) => {
+                const athleteData = radarData[athleteIndex].values;
+                
+                // Determine line style based on athlete status
+                let strokeDasharray = "";
+                if (athlete.status === 'DSQ') {
+                    strokeDasharray = "3,3"; // Dotted line for DSQ
+                } else if (athlete.status === 'DNF' || athlete.status === 'LAP') {
+                    strokeDasharray = "8,4"; // Dashed line for DNF/LAP
+                }
+                
+                // Only draw path if athlete has completed at least one segment
+                const hasData = athleteData.some(d => !d.incomplete);
+                if (hasData) {
+                    // Create custom path that includes origin (0,0) for incomplete segments
+                    const pathData = athleteData.map((d, i) => {
+                        if (d.incomplete) {
+                            return { value: 0 };  // Place at origin for incomplete segments
+                        }
+                        return d;
+                    });
+                    
+                    g.append("path")
+                        .datum(pathData)
+                        .attr("class", `radar-area radar-area-${athleteIndex}`)
+                        .attr("d", radarLine)
+                        .style("fill", colorScale(athlete.name))
+                        .style("fill-opacity", 0.2)
+                        .style("stroke", colorScale(athlete.name))
+                        .style("stroke-width", 2)
+                        .style("stroke-dasharray", strokeDasharray)
+                        .classed("hidden", !spiderAthleteVisibility[athlete.name]);
+                }  // Close the if (hasData) block
+                
+                // Add mouseover/mouseout handlers only if there's data
+                if (hasData) {
+                    d3.select(`.radar-area-${athleteIndex}`)
+                    .on("mouseover", function(event) {
+                        if (!spiderAthleteVisibility[athlete.name]) return;
+                        
+                        d3.select(this)
+                            .style("fill-opacity", 0.4)
+                            .style("stroke-width", 3);
+                        
+                        const tooltip = d3.select("#tooltip");
+                        tooltip.transition().duration(200).style("opacity", .9);
+                        // Build tooltip with only completed segments
+                        const athleteName = athlete.baseName || athlete.name.replace(/ \([^)]*\)$/, '');
+                        let tooltipContent = `<strong>${athleteName} ${athlete.country}</strong><br/>`;
+                        if (athlete.actualSwimTime) {
+                            tooltipContent += `Swim: ${secondsToTime(athlete.actualSwimTime)} (${athlete.swimSegmentRank || 'N/A'})<br/>`;
+                        }
+                        if (athlete.actualT1Time) {
+                            tooltipContent += `T1: ${secondsToTime(athlete.actualT1Time)} (${athlete.t1SegmentRank || 'N/A'})<br/>`;
+                        }
+                        if (athlete.actualBikeTime) {
+                            tooltipContent += `Bike: ${secondsToTime(athlete.actualBikeTime)} (${athlete.bikeSegmentRank || 'N/A'})<br/>`;
+                        } else if (athlete.status === 'DNF' || athlete.status === 'LAP') {
+                            tooltipContent += `Bike: DNF<br/>`;
+                        }
+                        if (athlete.actualT2Time) {
+                            tooltipContent += `T2: ${secondsToTime(athlete.actualT2Time)} (${athlete.t2SegmentRank || 'N/A'})<br/>`;
+                        }
+                        if (athlete.actualRunTime) {
+                            tooltipContent += `Run: ${secondsToTime(athlete.actualRunTime)} (${athlete.runSegmentRank || 'N/A'})<br/>`;
+                        } else if ((athlete.status === 'DNF' || athlete.status === 'LAP') && athlete.actualBikeTime) {
+                            tooltipContent += `Run: DNF<br/>`;
+                        }
+                        
+                        if (athlete.status) {
+                            tooltipContent += `<hr style="margin: 5px 0; border: 0; border-top: 1px solid rgba(255,255,255,0.3);">`;
+                            tooltipContent += `Status: ${athlete.status}`;
+                        } else {
+                            const totalTime = athlete.actualSwimTime + athlete.actualT1Time + athlete.actualBikeTime + 
+                                            athlete.actualT2Time + athlete.actualRunTime;
+                            tooltipContent += `<hr style="margin: 5px 0; border: 0; border-top: 1px solid rgba(255,255,255,0.3);">`;
+                            tooltipContent += `Total: ${secondsToTime(totalTime)} (${athlete.position || athlete.finalRank})`;
+                        }
+                        
+                        tooltip.html(tooltipContent)
+                        .style("left", (event.pageX + 10) + "px")
+                        .style("top", (event.pageY - 28) + "px");
+                    })
+                    .on("mouseout", function() {
+                        if (!spiderAthleteVisibility[athlete.name]) return;
+                        
+                        d3.select(this)
+                            .style("fill-opacity", 0.2)
+                            .style("stroke-width", 2);
+                        
+                        d3.select("#tooltip").transition()
+                            .duration(500)
+                            .style("opacity", 0);
+                    });
+                }  // Close the second if (hasData) block for event handlers
+                
+                // Only draw dots for completed segments
+                const dots = g.selectAll(`.radar-dots-${athleteIndex}`)
+                    .data(athleteData.filter(d => !d.incomplete))  // Only completed segments
+                    .enter()
+                    .append("circle")
+                    .attr("class", `radar-dots radar-dots-${athleteIndex}`)
+                    .attr("cx", (d, i) => {
+                        const actualIndex = axes.findIndex(ax => ax.axis === d.axis);
+                        return rScale(d.value) * Math.cos(angleSlice * actualIndex - Math.PI / 2);
+                    })
+                    .attr("cy", (d, i) => {
+                        const actualIndex = axes.findIndex(ax => ax.axis === d.axis);
+                        return rScale(d.value) * Math.sin(angleSlice * actualIndex - Math.PI / 2);
+                    })
+                    .attr("r", 4)
+                    .style("fill", colorScale(athlete.name))
+                    .style("fill-opacity", 0.8)
+                    .classed("hidden", !spiderAthleteVisibility[athlete.name]);
+            });
+            
+            const legend = d3.select("#spiderLegend");
+            
+            // Add toggle all button
+            const controls = legend.append("div")
+                .attr("class", "legend-controls")
+                .style("margin-bottom", "10px");
+            
+            controls.append("button")
+                .attr("class", "btn toggle-all")
+                .text("Show All")
+                .on("click", function() {
+                    const showAll = this.textContent === "Show All";
+                    this.textContent = showAll ? "Hide All" : "Show All";
+                    
+                    filteredData.forEach((athlete, index) => {
+                        spiderAthleteVisibility[athlete.name] = showAll;
+                        d3.selectAll(`.radar-area-${index}`).classed("hidden", !showAll);
+                        d3.selectAll(`.radar-dots-${index}`).classed("hidden", !showAll);
+                        d3.select(`#spider-legend-item-${index}`).classed("hidden", !showAll);
+                    });
+                });
+            
+            filteredData.forEach((athlete, index) => {
+                const item = legend.append("div")
+                    .attr("id", `spider-legend-item-${index}`)
+                    .attr("class", `legend-item ${spiderAthleteVisibility[athlete.name] ? '' : 'hidden'}`)
+                    .style("cursor", "pointer")
+                    .on("click", function() {
+                        spiderAthleteVisibility[athlete.name] = !spiderAthleteVisibility[athlete.name];
+                        d3.select(this).classed("hidden", !spiderAthleteVisibility[athlete.name]);
+                        
+                        if (spiderAthleteVisibility[athlete.name]) {
+                            d3.selectAll(`.radar-area-${index}`).classed("hidden", false);
+                            d3.selectAll(`.radar-dots-${index}`).classed("hidden", false);
+                        } else {
+                            d3.selectAll(`.radar-area-${index}`).classed("hidden", true);
+                            d3.selectAll(`.radar-dots-${index}`).classed("hidden", true);
+                        }
+                    });
+                
+                item.append("div")
+                    .attr("class", "legend-color")
+                    .style("background-color", colorScale(athlete.name));
+                
+                item.append("div")
+                    .attr("class", "legend-text")
+                    .text(() => {
+                        const athleteName = athlete.baseName || athlete.name.replace(/ \([^)]*\)$/, '');
+                        if (athlete.finalRank) {
+                            return `${athlete.finalRank}. ${athleteName} ${athlete.country}`;
+                        } else if (athlete.status) {
+                            return `${athleteName} ${athlete.country} (${athlete.status})`;
+                        }
+                        return `${athleteName} ${athlete.country}`;
+                    });
+            });
+        }
+    </script>
+</body>
+</html>
