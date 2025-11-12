@@ -60,7 +60,6 @@ export class SidebarManager {
             this.content.innerHTML = html;
         }
     }
-    
     populateDevelopmentControls(data, config) {
         if (!data || !this.content) return;
         
@@ -74,6 +73,9 @@ export class SidebarManager {
             colorScale,
             currentSection = 'all'
         } = config;
+        
+        // Store colorScale for later use
+        this.colorScale = colorScale;
         
         let html = '';
         
@@ -96,14 +98,12 @@ export class SidebarManager {
             html += `<button class="btn ${activeClass}" data-section="${section.key}" style="padding: 8px 12px; font-size: 13px;">${section.label}</button>`;
         });
         
-        // Add zoom button (spans full width)
         if (!responsiveManager.isMobile) {
             html += `<button class="btn" id="zoomModeBtn" style="padding: 8px 12px; font-size: 13px; grid-column: span 2;">🔍 Zoom (Hold Shift)</button>`;
             html += `<button class="btn" id="resetZoomBtn" style="padding: 8px 12px; font-size: 13px; grid-column: span 2; display: none;">↩️ Reset Zoom</button>`;
         }
         
         html += '</div></div>';
-
         
         // Athlete controls
         html += this.generateAthleteControls(data, {
@@ -128,7 +128,6 @@ export class SidebarManager {
                 if (onSectionChange) onSectionChange(btn.dataset.section);
                 this.updateSectionButtons(btn.dataset.section);
                 
-                // Show/hide reset button
                 const resetBtn = document.getElementById('resetZoomBtn');
                 if (resetBtn) {
                     resetBtn.style.display = 'none';
@@ -136,7 +135,6 @@ export class SidebarManager {
             });
         });
         
-        // Zoom button
         const zoomBtn = document.getElementById('zoomModeBtn');
         const resetBtn = document.getElementById('resetZoomBtn');
 
@@ -145,13 +143,11 @@ export class SidebarManager {
                 onSectionChange('zoom');
             }
             
-            // Update button states
             this.content.querySelectorAll('[data-section]').forEach(btn => {
                 btn.classList.remove('active');
             });
             zoomBtn.classList.add('active');
             
-            // Show reset button
             if (resetBtn) {
                 resetBtn.style.display = 'block';
             }
@@ -162,16 +158,16 @@ export class SidebarManager {
                 onSectionChange('reset');
             }
             
-            // Reset to 'all' section
             this.updateSectionButtons('all');
             zoomBtn.classList.remove('active');
             resetBtn.style.display = 'none';
         });       
+        
         this.content.querySelector('#athleteToggleBtn')?.addEventListener('click', (e) => {
             const showAll = e.target.textContent === 'Show All';
             e.target.textContent = showAll ? 'Hide All' : 'Show All';
             if (onToggleAll) onToggleAll(showAll);
-            this.updateAllAthleteButtons(showAll);
+            this.updateAllAthleteButtonsWithColors(showAll, athleteVisibility, colorScale);
         });
         
         this.content.querySelectorAll('[data-group]').forEach(btn => {
@@ -185,76 +181,17 @@ export class SidebarManager {
             btn.addEventListener('click', () => {
                 const athleteData = JSON.parse(btn.dataset.athlete);
                 if (onToggleAthlete) onToggleAthlete(athleteData.name, athleteData.index);
-                btn.classList.toggle('hidden');
+                // Button state will be updated by main.js callback
             });
         });
         
         this.content.querySelectorAll('[data-country]').forEach(btn => {
             btn.addEventListener('click', () => {
                 if (onToggleCountry) onToggleCountry(btn.dataset.country);
-                btn.classList.toggle('hidden');
             });
         });
     }
-    
-    populateSpiderControls(data, config) {
-        if (!data || !this.content) return;
-        
-        const { 
-            onToggleAll,
-            onToggleGroup,
-            onToggleAthlete,
-            onToggleCountry,
-            athleteVisibility,
-            colorScale
-        } = config;
-        
-        let html = this.generateAthleteControls(data, {
-            athleteVisibility,
-            colorScale,
-            toggleBtnId: 'spiderToggleBtn',
-            defaultVisibility: (athlete) => athlete.finalRank && athlete.finalRank <= 5 && !['DNF', 'LAP', 'DSQ'].includes(athlete.status),
-            groupLabels: [
-                { name: "Top 5", range: [1, 5] },
-                { name: "6-10", range: [6, 10] },
-                { name: "11-20", range: [11, 20] },
-                { name: "21+", range: [21, Infinity] }
-            ]
-        });
-        
-        this.setContent(html);
-        
-        // Add event listeners
-        this.content.querySelector('#spiderToggleBtn')?.addEventListener('click', (e) => {
-            const showAll = e.target.textContent === 'Show All';
-            e.target.textContent = showAll ? 'Hide All' : 'Show All';
-            if (onToggleAll) onToggleAll(showAll);
-            this.updateAllAthleteButtons(showAll);
-        });
-        
-        this.content.querySelectorAll('[data-group]').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const groupData = JSON.parse(btn.dataset.group);
-                if (onToggleGroup) onToggleGroup(groupData);
-            });
-        });
-        
-        this.content.querySelectorAll('[data-athlete]').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const athleteName = btn.dataset.athleteName;
-                if (onToggleAthlete) onToggleAthlete(athleteName);
-                btn.classList.toggle('hidden');
-            });
-        });
-        
-        this.content.querySelectorAll('[data-country]').forEach(btn => {
-            btn.addEventListener('click', () => {
-                if (onToggleCountry) onToggleCountry(btn.dataset.country);
-                btn.classList.toggle('hidden');
-            });
-        });
-    }
-    
+
     generateAthleteControls(data, config) {
         const { athleteVisibility, colorScale, toggleBtnId, defaultVisibility, groupLabels } = config;
         
@@ -290,16 +227,20 @@ export class SidebarManager {
         sortedAthletes.forEach((athlete) => {
             const athleteIndex = data.indexOf(athlete);
             const isVisible = athleteVisibility[athlete.name] !== false;
-            const hiddenClass = isVisible ? '' : 'hidden';
             const color = colorScale(athlete.name);
             const rank = athlete.finalRank ? `${athlete.finalRank}.` : '';
             const flag = getFlag(athlete.country);
             const name = athlete.baseName || athlete.name.replace(/ \([^)]*\)$/, '');
             
-            html += `<button class="btn ${hiddenClass}" 
+            // Store color and visibility state
+            const bgColor = isVisible ? (color + '99') : '#cccccc';
+            const opacity = isVisible ? '1' : '0.4';
+            
+            html += `<button class="btn athlete-btn" 
                 data-athlete='${JSON.stringify({name: athlete.name, index: athleteIndex})}'
                 data-athlete-name="${athlete.name}"
-                style="width: 100%; text-align: left; padding: 8px 12px; font-size: 12px; margin-bottom: 2px; height: 36px; background-color: ${color}99; border: 2px solid ${color}; color: #000;">
+                data-color="${color}"
+                style="width: 100%; text-align: left; padding: 8px 12px; font-size: 12px; margin-bottom: 2px; height: 36px; background-color: ${bgColor}; border: 2px solid ${color}; color: #000; opacity: ${opacity};">
                 ${rank} ${name} ${flag}
             </button>`;
         });
@@ -313,7 +254,7 @@ export class SidebarManager {
         const countries = [...new Set(data.map(d => d.country))].sort();
         countries.forEach(country => {
             const flag = getFlag(country);
-            html += `<button class="btn" data-country="${country}" title="${country}" style="font-size: 11px; padding: 6px 4px; margin: 0; height: 36px; display: flex; align-items: center; justify-content: center;">
+            html += `<button class="btn country-btn" data-country="${country}" title="${country}" style="font-size: 11px; padding: 6px 4px; margin: 0; height: 36px; display: flex; align-items: center; justify-content: center;">
                 <span class="country-flag">${flag}</span><span>${country}</span>
             </button>`;
         });
@@ -322,40 +263,42 @@ export class SidebarManager {
         
         return html;
     }
-    
-    updateSectionButtons(activeSection) {
-        this.content.querySelectorAll('[data-section]').forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.section === activeSection);
-        });
-    }
-    
-    updateAllAthleteButtons(show) {
-        this.content.querySelectorAll('[data-athlete], [data-country]').forEach(btn => {
+
+    updateAllAthleteButtonsWithColors(show, athleteVisibility, colorScale) {
+        // Update all athlete buttons
+        this.content.querySelectorAll('.athlete-btn').forEach(btn => {
+            const athleteName = btn.dataset.athleteName;
+            const color = btn.dataset.color;
+            
             if (show) {
-                btn.classList.remove('hidden');
-                btn.style.opacity = '';
-                btn.style.backgroundColor = '';
+                btn.style.opacity = '1';
+                btn.style.backgroundColor = color + '99';
             } else {
-                btn.classList.add('hidden');
-                btn.style.opacity = '0.3';
+                btn.style.opacity = '0.4';
+                btn.style.backgroundColor = '#cccccc';
+            }
+        });
+        
+        // Update country buttons
+        this.content.querySelectorAll('.country-btn').forEach(btn => {
+            if (show) {
+                btn.style.opacity = '1';
+            } else {
+                btn.style.opacity = '0.4';
             }
         });
     }
-    
-    updateAthleteButton(athleteName, isVisible) {
-        const btn = this.content.querySelector(`[data-athlete-name="${athleteName}"]`);
-        if (btn) {
-            btn.classList.toggle('hidden', !isVisible);
-        }
-    }
+
     updateAthleteButtonState(athleteName, isVisible) {
         const btn = this.content?.querySelector(`[data-athlete-name="${athleteName}"]`);
         if (btn) {
-            btn.classList.toggle('hidden', !isVisible);
+            const color = btn.dataset.color;
             if (isVisible) {
-                btn.style.opacity = '';
+                btn.style.opacity = '1';
+                btn.style.backgroundColor = color + '99';
             } else {
-                btn.style.opacity = '0.3';
+                btn.style.opacity = '0.4';
+                btn.style.backgroundColor = '#cccccc';
             }
         }
     }
@@ -364,33 +307,123 @@ export class SidebarManager {
         const btn = this.content?.querySelector(`[data-country="${country}"]`);
         if (btn) {
             if (state === 'selected') {
-                btn.classList.remove('hidden');
                 btn.style.opacity = '1';
-                // Could add border or background color here
+                btn.style.border = '2px solid #4CAF50';
+                btn.style.fontWeight = 'bold';
             } else if (state === true) {
-                btn.classList.remove('hidden');
-                btn.style.opacity = '0.7';
+                btn.style.opacity = '1';
+                btn.style.border = '';
+                btn.style.fontWeight = '';
             } else {
-                btn.classList.add('hidden');
-                btn.style.opacity = '0.3';
+                btn.style.opacity = '0.4';
+                btn.style.border = '';
+                btn.style.fontWeight = '';
             }
         }
     }
 
     resetAllButtonStates(show) {
-        const buttons = this.content?.querySelectorAll('[data-athlete], [data-athlete-name], [data-country]');
-        buttons?.forEach(btn => {
+        // This method is called when toggling all athletes
+        // We need the color information from the buttons themselves
+        this.content.querySelectorAll('.athlete-btn').forEach(btn => {
+            const color = btn.dataset.color;
             if (show) {
-                btn.classList.remove('hidden');
-                btn.style.opacity = '';
-                btn.style.backgroundColor = '';
-                btn.style.border = '';
+                btn.style.opacity = '1';
+                btn.style.backgroundColor = color + '99';
             } else {
-                btn.classList.add('hidden');
-                btn.style.opacity = '0.3';
+                btn.style.opacity = '0.4';
+                btn.style.backgroundColor = '#cccccc';
+            }
+        });
+        
+        this.content.querySelectorAll('.country-btn').forEach(btn => {
+            if (show) {
+                btn.style.opacity = '1';
+            } else {
+                btn.style.opacity = '0.4';
             }
         });
     }
+
+    // Also update the Spider controls to use the same pattern
+    populateSpiderControls(data, config) {
+        if (!data || !this.content) return;
+        
+        const { 
+            onToggleAll,
+            onToggleGroup,
+            onToggleAthlete,
+            onToggleCountry,
+            athleteVisibility,
+            colorScale
+        } = config;
+        
+        let html = this.generateAthleteControls(data, {
+            athleteVisibility,
+            colorScale,
+            toggleBtnId: 'spiderToggleBtn',
+            defaultVisibility: (athlete) => athlete.finalRank && athlete.finalRank <= 5 && !['DNF', 'LAP', 'DSQ'].includes(athlete.status),
+            groupLabels: [
+                { name: "Top 5", range: [1, 5] },
+                { name: "6-10", range: [6, 10] },
+                { name: "11-20", range: [11, 20] },
+                { name: "21+", range: [21, Infinity] }
+            ]
+        });
+        
+        this.setContent(html);
+        
+        // Add event listeners
+        this.content.querySelector('#spiderToggleBtn')?.addEventListener('click', (e) => {
+            const showAll = e.target.textContent === 'Show All';
+            e.target.textContent = showAll ? 'Hide All' : 'Show All';
+            if (onToggleAll) onToggleAll(showAll);
+            this.updateAllAthleteButtonsWithColors(showAll, athleteVisibility, colorScale);
+        });
+        
+        this.content.querySelectorAll('[data-group]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const groupData = JSON.parse(btn.dataset.group);
+                if (onToggleGroup) onToggleGroup(groupData);
+            });
+        });
+        
+        this.content.querySelectorAll('[data-athlete]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const athleteName = btn.dataset.athleteName;
+                if (onToggleAthlete) onToggleAthlete(athleteName);
+                // Toggle button state immediately
+                const color = btn.dataset.color;
+                const isCurrentlyActive = btn.style.opacity !== '0.4';
+                if (isCurrentlyActive) {
+                    btn.style.opacity = '0.4';
+                    btn.style.backgroundColor = '#cccccc';
+                } else {
+                    btn.style.opacity = '1';
+                    btn.style.backgroundColor = color + '99';
+                }
+            });
+        });
+        
+        this.content.querySelectorAll('[data-country]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (onToggleCountry) onToggleCountry(btn.dataset.country);
+            });
+        });
+    }
+
+
+
+    
+    updateSectionButtons(activeSection) {
+        this.content.querySelectorAll('[data-section]').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.section === activeSection);
+        });
+    }
+    
+
+    
+
 }
 
 export const sidebarManager = new SidebarManager();

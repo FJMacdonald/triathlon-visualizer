@@ -21,8 +21,11 @@ export class DevelopmentChart extends BaseChart {
         this.stageDist = {};
         this.sectionBounds = {};
         this.segmentLeaders = {};
+        this.stageLeaderTimes = {};
         this.zoomMode = false;
         this.onAthleteClick = null;
+        this.useScrollable = false;
+        this.heightMultiplier = 1.0; // User control for chart height
     }
     
     setSegmentLeaders(leaders) {
@@ -37,7 +40,6 @@ export class DevelopmentChart extends BaseChart {
     restoreState() {
         if (!this.data || !this.chartData) return;
         
-        // Restore visibility for all paths and circles based on current state
         this.data.forEach((athlete, index) => {
             const isVisible = this.athleteVisibility[athlete.name] !== false;
             d3.selectAll(`.athlete-path-${index}`).classed("hidden", !isVisible);
@@ -45,10 +47,7 @@ export class DevelopmentChart extends BaseChart {
             d3.selectAll(`.athlete-circle-${index}`).classed("hidden", !isVisible);
         });
         
-        // Redraw team highlights
         this.drawTeamHighlights();
-        
-        // Recalculate and update scales based on visible athletes
         this.update();
     }
     
@@ -58,35 +57,140 @@ export class DevelopmentChart extends BaseChart {
         this.clear();
         
         const racers = this.data.filter(a => a.status !== 'DNS');
-        const { svg, g, width, height, margin } = this.createSVG();
         const isMobile = responsiveManager.isMobile;
         
-        // Add clipping path
-        svg.append("defs")
-            .append("clipPath")
-            .attr("id", "chart-clip")
-            .append("rect")
-            .attr("x", 0)
-            .attr("y", 0)
-            .attr("width", width)
-            .attr("height", height);
-        
-        // Calculate stage positions
+        // Calculate stage positions first
         this.calculateStagePositions(racers);
+        
+        // Calculate leader times at each stage
+        this.calculateStageLeaderTimes(racers);
         
         // Process chart data
         this.processChartData(racers);
         
-        // Setup scales
-        const maxTimeBehind = d3.max(this.chartData, d => d3.max(d.values, v => v.timeBehind));
+        // Determine if we should use scrollable view
+        this.useScrollable = this.data.length > 40 || (isMobile && this.data.length > 25);
         
+        if (this.useScrollable) {
+            this.drawScrollableChart(racers);
+        } else {
+            this.drawStandardChart(racers);
+        }
+    }
+    
+    calculateStageLeaderTimes(racers) {
+        const validRacers = racers.filter(a => !['DNF', 'DSQ', 'LAP'].includes(a.status));
+        
+        this.stageLeaderTimes = {
+            swim: d3.min(validRacers.filter(a => a.actualSwimTime), a => a.swimCumulative) || 0,
+            t1: d3.min(validRacers.filter(a => a.actualT1Time), a => a.t1Cumulative) || 0,
+            bike: d3.min(validRacers.filter(a => a.actualBikeTime), a => a.bikeCumulative) || 0,
+            t2: d3.min(validRacers.filter(a => a.actualT2Time), a => a.t2Cumulative) || 0,
+            finish: d3.min(validRacers.filter(a => a.actualRunTime), a => a.totalCumulative) || 0
+        };
+    }
+    
+    drawScrollableChart(racers) {
+        const container = d3.select(this.container);
+        const containerWidth = container.node().getBoundingClientRect().width;
+        const isMobile = responsiveManager.isMobile;
+        
+        // Calculate dimensions - extra right margin for finish circles
+        const margin = { top: 10, right: 30, bottom: 20, left: 55 };
+        const width = containerWidth - margin.left - margin.right - 30;
+        
+        // Calculate max time behind for height calculation
+        const maxTimeBehind = d3.max(this.chartData, d => d3.max(d.values, v => v.timeBehind)) || 100;
+        
+        // Apply height multiplier for user control
+        const baseHeight = Math.max(300, (maxTimeBehind + 20) * 1.2);
+        const fullHeight = baseHeight * this.heightMultiplier;
+        
+        const maxViewportHeight = isMobile ? 
+            Math.min(window.innerHeight * 0.5, 350) : 
+            Math.min(window.innerHeight * 0.6, 500);
+        const viewportHeight = Math.min(fullHeight + 50, maxViewportHeight);
+        
+        // Clear and setup container
+        container.html('');
+        container.style('position', 'relative');
+        
+        // Create main wrapper with flexbox for Y-axis label
+        const wrapper = container.append('div')
+            .attr('class', 'chart-wrapper')
+            .style('display', 'flex')
+            .style('align-items', 'stretch');
+        
+        // Y-axis label (outside scroll area)
+        wrapper.append('div')
+            .attr('class', 'y-axis-label-container')
+            .style('writing-mode', 'vertical-rl')
+            .style('transform', 'rotate(180deg)')
+            .style('display', 'flex')
+            .style('align-items', 'center')
+            .style('justify-content', 'center')
+            .style('padding', '0 5px')
+            .style('font-size', isMobile ? '12px' : '14px')
+            .style('font-weight', 'bold')
+            .style('color', '#333')
+            .text('Time Behind Leader (seconds)');
+        
+        // Main chart area
+        const chartArea = wrapper.append('div')
+            .attr('class', 'chart-area')
+            .style('flex', '1')
+            .style('display', 'flex')
+            .style('flex-direction', 'column');
+        
+        // Height control slider
+        this.addHeightControl(chartArea);
+        
+        // Create fixed header for X-axis
+        const headerHeight = 40;
+        const headerSvg = chartArea.append('svg')
+            .attr('class', 'chart-header')
+            .attr('width', containerWidth - 30)
+            .attr('height', headerHeight);
+        
+        const headerG = headerSvg.append('g')
+            .attr('transform', `translate(${margin.left}, ${headerHeight - 5})`);
+        
+        // Create scrollable container
+        const scrollContainer = chartArea.append('div')
+            .attr('class', 'scroll-container')
+            .style('height', `${viewportHeight}px`)
+            .style('overflow-y', 'auto')
+            .style('overflow-x', 'hidden')
+            .style('border', '1px solid #ddd')
+            .style('border-radius', '4px')
+            .style('background', '#fafafa');
+        
+        // Create the main SVG inside scrollable container
+        const svg = scrollContainer.append('svg')
+            .attr('width', containerWidth - 30)
+            .attr('height', fullHeight + margin.bottom + 20); // Extra space for circles
+        
+        // Add clipping path - include extra space for finish circles
+        svg.append("defs")
+            .append("clipPath")
+            .attr("id", "chart-clip")
+            .append("rect")
+            .attr("x", -5)
+            .attr("y", -5)
+            .attr("width", width + 15) // Extra width for finish circles
+            .attr("height", fullHeight + margin.bottom + 10);
+        
+        const g = svg.append('g')
+            .attr('transform', `translate(${margin.left}, 5)`);
+        
+        // Setup scales
         this.originalXScale = d3.scaleLinear()
             .domain([0, 100])
             .range([0, width]);
         
         this.originalYScale = d3.scaleLinear()
-            .domain([-maxTimeBehind - 10, 10])
-            .range([height, 0]);
+            .domain([0, maxTimeBehind + 10])
+            .range([0, fullHeight]);
         
         this.xScale = this.originalXScale.copy();
         this.yScale = this.originalYScale.copy();
@@ -94,12 +198,149 @@ export class DevelopmentChart extends BaseChart {
         // Create line generator
         this.lineGenerator = d3.line()
             .x(d => this.xScale(d.distance))
-            .y(d => this.yScale(-d.timeBehind))
+            .y(d => this.yScale(d.timeBehind))
+            .curve(d3.curveLinear);
+        
+        // Store references
+        this.svg = svg;
+        this.g = g;
+        this.headerG = headerG;
+        this.dimensions = { width, height: fullHeight, margin };
+        this.scrollContainer = scrollContainer;
+        
+        // Draw header (X-axis labels)
+        this.drawXAxisHeader(headerG, this.xScale, width);
+        
+        // Draw Y-axis
+        this.drawYAxisScrollable(g, fullHeight, isMobile);
+        
+        // Draw grid
+        this.drawGridScrollable(g, width, fullHeight);
+        
+        // Draw transition lines
+        this.drawTransitionLines(g, fullHeight);
+        
+        // Create content group with clipping
+        const chartContent = g.append("g")
+            .attr("class", "chart-content")
+            .attr("clip-path", "url(#chart-clip)");
+        
+        // Draw athlete paths
+        this.drawAthletePaths(chartContent);
+        
+        // Draw team highlights
+        this.drawTeamHighlights();
+        
+        // Add scroll info
+        chartArea.append('div')
+            .attr('class', 'scroll-info')
+            .style('text-align', 'center')
+            .style('font-size', '11px')
+            .style('color', '#666')
+            .style('margin-top', '5px')
+            .style('padding', '4px')
+            .style('background', '#f5f5f5')
+            .style('border-radius', '3px')
+            .text('Scroll to see athletes further behind • Use slider above to adjust spread');
+        
+        this.restoreState();
+    }
+    
+    addHeightControl(container) {
+        const controlDiv = container.append('div')
+            .attr('class', 'height-control')
+            .style('margin-bottom', '8px')
+            .style('padding', '8px')
+            .style('background', '#f0f0f0')
+            .style('border-radius', '4px')
+            .style('display', 'flex')
+            .style('align-items', 'center')
+            .style('gap', '10px')
+            .style('font-size', '12px');
+        
+        controlDiv.append('label')
+            .text('Chart Height:')
+            .style('font-weight', 'bold')
+            .style('white-space', 'nowrap');
+        
+        const sliderContainer = controlDiv.append('div')
+            .style('flex', '1')
+            .style('display', 'flex')
+            .style('align-items', 'center')
+            .style('gap', '8px');
+        
+        sliderContainer.append('span')
+            .text('Compact')
+            .style('font-size', '10px')
+            .style('color', '#666');
+        
+        const slider = sliderContainer.append('input')
+            .attr('type', 'range')
+            .attr('min', '0.5')
+            .attr('max', '3')
+            .attr('step', '0.1')
+            .attr('value', this.heightMultiplier)
+            .style('flex', '1')
+            .style('cursor', 'pointer');
+        
+        sliderContainer.append('span')
+            .text('Expanded')
+            .style('font-size', '10px')
+            .style('color', '#666');
+        
+        const valueDisplay = controlDiv.append('span')
+            .attr('class', 'height-value')
+            .text(`${this.heightMultiplier.toFixed(1)}x`)
+            .style('min-width', '35px')
+            .style('text-align', 'right');
+        
+        slider.on('input', (event) => {
+            this.heightMultiplier = parseFloat(event.target.value);
+            valueDisplay.text(`${this.heightMultiplier.toFixed(1)}x`);
+        });
+        
+        slider.on('change', () => {
+            // Redraw chart with new height
+            this.draw();
+        });
+    }
+    
+    drawStandardChart(racers) {
+        const { svg, g, width, height, margin } = this.createSVG();
+        const isMobile = responsiveManager.isMobile;
+        
+        // Add clipping path with extra space for finish circles
+        svg.append("defs")
+            .append("clipPath")
+            .attr("id", "chart-clip")
+            .append("rect")
+            .attr("x", -5)
+            .attr("y", -5)
+            .attr("width", width + 15)
+            .attr("height", height + 10);
+        
+        // Setup scales
+        const maxTimeBehind = d3.max(this.chartData, d => d3.max(d.values, v => v.timeBehind)) || 100;
+        
+        this.originalXScale = d3.scaleLinear()
+            .domain([0, 100])
+            .range([0, width]);
+        
+        this.originalYScale = d3.scaleLinear()
+            .domain([0, maxTimeBehind + 10])
+            .range([0, height]);
+        
+        this.xScale = this.originalXScale.copy();
+        this.yScale = this.originalYScale.copy();
+        
+        // Create line generator
+        this.lineGenerator = d3.line()
+            .x(d => this.xScale(d.distance))
+            .y(d => this.yScale(d.timeBehind))
             .curve(d3.curveLinear);
         
         // Setup axes
-        this.setupAxes(this.xScale, this.yScale, "Race Progress", "Time Behind Leader");
-        this.customizeAxes(g, width, height, isMobile);
+        this.setupAxesStandard(g, width, height, isMobile);
         
         // Draw transition lines
         this.drawTransitionLines(g, height);
@@ -111,13 +352,179 @@ export class DevelopmentChart extends BaseChart {
         
         // Draw athlete paths
         this.drawAthletePaths(chartContent);
-
-        // Draw athlete paths
-        this.drawAthletePaths(chartContent);
         
-        // Draw team highlights if any
+        // Draw team highlights
         this.drawTeamHighlights();
         this.restoreState();
+    }
+    
+    setupAxesStandard(g, width, height, isMobile) {
+        // X-axis
+        g.append("g")
+            .attr("class", "x-axis axis")
+            .attr("transform", `translate(0,${height})`)
+            .call(d3.axisBottom(this.xScale)
+                .tickValues([0, this.stageDist.swim, this.stageDist.t1, this.stageDist.bike, this.stageDist.t2, 100])
+                .tickFormat("")
+            );
+        
+        // Add x-axis labels
+        const xLabels = g.select('.x-axis').append("g").attr("class", "x-labels");
+        const labels = [
+            { x: this.stageDist.swim / 2, text: 'Swim', class: 'x-label-swim' },
+            { x: (this.stageDist.swim + this.stageDist.t1) / 2, text: 'T1', class: 'x-label-t1' },
+            { x: (this.stageDist.t1 + this.stageDist.bike) / 2, text: 'Bike', class: 'x-label-bike' },
+            { x: (this.stageDist.bike + this.stageDist.t2) / 2, text: 'T2', class: 'x-label-t2' },
+            { x: (this.stageDist.t2 + 100) / 2, text: 'Run', class: 'x-label-run' }
+        ];
+        
+        labels.forEach(label => {
+            xLabels.append("text")
+                .attr("class", label.class)
+                .attr("x", this.xScale(label.x))
+                .attr("y", isMobile ? 25 : 30)
+                .style("text-anchor", "middle")
+                .style("font-size", isMobile ? "10px" : "12px")
+                .style("fill", "black")
+                .text(label.text);
+        });
+        
+        // Y-axis
+        g.append("g")
+            .attr("class", "y-axis axis")
+            .call(d3.axisLeft(this.yScale)
+                .tickFormat(d => {
+                    if (d === 0) return 'Leader';
+                    if (isMobile) return Math.floor(d / 60) + 'm';
+                    return secondsToTime(d);
+                })
+                .ticks(isMobile ? 5 : 10)
+            );
+        
+        // Y-axis label
+        g.append("text")
+            .attr("class", "y-axis-label axis-label")
+            .attr("transform", "rotate(-90)")
+            .attr("y", isMobile ? -40 : -55)
+            .attr("x", -(height / 2))
+            .attr("dy", "1em")
+            .style("text-anchor", "middle")
+            .style("font-size", isMobile ? "12px" : "14px")
+            .text("Time Behind Leader");
+        
+        // X-axis label
+        g.append("text")
+            .attr("class", "x-axis-label axis-label")
+            .attr("x", width / 2)
+            .attr("y", height + (isMobile ? 45 : 50))
+            .style("text-anchor", "middle")
+            .style("font-size", isMobile ? "12px" : "14px")
+            .text("Race Progress");
+        
+        // Grid lines
+        g.append("g")
+            .attr("class", "grid grid-x")
+            .attr("transform", `translate(0,${height})`)
+            .call(d3.axisBottom(this.xScale).tickSize(-height).tickFormat(""));
+        
+        g.append("g")
+            .attr("class", "grid grid-y")
+            .call(d3.axisLeft(this.yScale).tickSize(-width).tickFormat(""));
+    }
+    
+    drawXAxisHeader(g, xScale, width) {
+        const xLabels = [
+            { pos: this.stageDist.swim / 2, text: 'SWIM', class: 'x-label-swim' },
+            { pos: (this.stageDist.swim + this.stageDist.t1) / 2, text: 'T1', class: 'x-label-t1' },
+            { pos: (this.stageDist.t1 + this.stageDist.bike) / 2, text: 'BIKE', class: 'x-label-bike' },
+            { pos: (this.stageDist.bike + this.stageDist.t2) / 2, text: 'T2', class: 'x-label-t2' },
+            { pos: (this.stageDist.t2 + 100) / 2, text: 'RUN', class: 'x-label-run' }
+        ];
+        
+        // Background for header
+        g.append('rect')
+            .attr('class', 'header-bg')
+            .attr('x', 0)
+            .attr('y', -30)
+            .attr('width', width)
+            .attr('height', 30)
+            .attr('fill', '#f5f5f5')
+            .attr('rx', 3);
+        
+        xLabels.forEach(label => {
+            g.append("text")
+                .attr("class", label.class)
+                .attr("x", xScale(label.pos))
+                .attr("y", -10)
+                .style("text-anchor", "middle")
+                .style("font-size", "11px")
+                .style("font-weight", "bold")
+                .style("fill", "#333")
+                .text(label.text);
+        });
+        
+        // Stage separators in header
+        const positions = [0, this.stageDist.swim, this.stageDist.t1, this.stageDist.bike, this.stageDist.t2, 100];
+        positions.forEach(pos => {
+            g.append("line")
+                .attr("class", `header-divider-${pos}`)
+                .attr("x1", xScale(pos))
+                .attr("x2", xScale(pos))
+                .attr("y1", -30)
+                .attr("y2", 0)
+                .attr("stroke", "#ccc")
+                .attr("stroke-width", 1);
+        });
+    }
+    
+    drawYAxisScrollable(g, height, isMobile) {
+        const yAxis = d3.axisLeft(this.yScale)
+            .tickFormat(d => {
+                if (d === 0) return 'Leader';
+                if (isMobile) return Math.floor(d / 60) + 'm';
+                return secondsToTime(d);
+            })
+            .ticks(isMobile ? 8 : 12);
+        
+        g.append("g")
+            .attr("class", "y-axis")
+            .call(yAxis);
+    }
+    
+    drawGridScrollable(g, width, height) {
+        // Vertical grid lines for stages
+        const positions = [
+            { pos: this.stageDist.swim, class: 'grid-line-swim' },
+            { pos: this.stageDist.t1, class: 'grid-line-t1' },
+            { pos: this.stageDist.bike, class: 'grid-line-bike' },
+            { pos: this.stageDist.t2, class: 'grid-line-t2' }
+        ];
+        
+        const gridGroup = g.append("g").attr("class", "vertical-grid");
+        
+        positions.forEach(item => {
+            gridGroup.append("line")
+                .attr("class", item.class)
+                .attr("x1", this.xScale(item.pos))
+                .attr("x2", this.xScale(item.pos))
+                .attr("y1", 0)
+                .attr("y2", height)
+                .attr("stroke", "#e0e0e0")
+                .attr("stroke-width", 1)
+                .attr("stroke-dasharray", "3,3");
+        });
+        
+        // Horizontal grid lines
+        const yTicks = this.yScale.ticks(10);
+        yTicks.forEach(tick => {
+            g.append("line")
+                .attr("x1", 0)
+                .attr("x2", width)
+                .attr("y1", this.yScale(tick))
+                .attr("y2", this.yScale(tick))
+                .attr("stroke", "#f0f0f0")
+                .attr("stroke-width", 0.5);
+        });
     }
     
     calculateStagePositions(racers) {
@@ -154,8 +561,6 @@ export class DevelopmentChart extends BaseChart {
     }
     
     processChartData(racers) {
-        const leader = racers.filter(a => !['DNF', 'DSQ', 'LAP'].includes(a.status))[0];
-        
         this.chartData = racers.map(athlete => {
             const values = [{stage: "Start", distance: 0, timeBehind: 0, cumTime: 0}];
             
@@ -163,7 +568,7 @@ export class DevelopmentChart extends BaseChart {
                 values.push({
                     stage: "Swim",
                     distance: this.stageDist.swim,
-                    timeBehind: athlete.swimCumulative - leader.swimCumulative,
+                    timeBehind: athlete.swimCumulative - this.stageLeaderTimes.swim,
                     cumTime: athlete.swimCumulative
                 });
             }
@@ -171,7 +576,7 @@ export class DevelopmentChart extends BaseChart {
                 values.push({
                     stage: "T1",
                     distance: this.stageDist.t1,
-                    timeBehind: athlete.t1Cumulative - leader.t1Cumulative,
+                    timeBehind: athlete.t1Cumulative - this.stageLeaderTimes.t1,
                     cumTime: athlete.t1Cumulative
                 });
             }
@@ -179,7 +584,7 @@ export class DevelopmentChart extends BaseChart {
                 values.push({
                     stage: "Bike",
                     distance: this.stageDist.bike,
-                    timeBehind: athlete.bikeCumulative - leader.bikeCumulative,
+                    timeBehind: athlete.bikeCumulative - this.stageLeaderTimes.bike,
                     cumTime: athlete.bikeCumulative
                 });
             }
@@ -187,7 +592,7 @@ export class DevelopmentChart extends BaseChart {
                 values.push({
                     stage: "T2",
                     distance: this.stageDist.t2,
-                    timeBehind: athlete.t2Cumulative - leader.t2Cumulative,
+                    timeBehind: athlete.t2Cumulative - this.stageLeaderTimes.t2,
                     cumTime: athlete.t2Cumulative
                 });
             }
@@ -195,7 +600,7 @@ export class DevelopmentChart extends BaseChart {
                 values.push({
                     stage: "Finish",
                     distance: 100,
-                    timeBehind: athlete.totalCumulative - leader.totalCumulative,
+                    timeBehind: athlete.totalCumulative - this.stageLeaderTimes.finish,
                     cumTime: athlete.totalCumulative
                 });
             }
@@ -209,48 +614,6 @@ export class DevelopmentChart extends BaseChart {
                 values: values
             };
         });
-    }
-    
-    customizeAxes(g, width, height, isMobile) {
-        // Customize x-axis with stage labels
-        g.select(".x-axis")
-            .call(d3.axisBottom(this.xScale)
-                .tickValues([0, this.stageDist.swim, this.stageDist.t1, this.stageDist.bike, this.stageDist.t2, 100])
-                .tickFormat("")
-            );
-        
-        const xLabels = g.select('.x-axis').append("g").attr("class", "x-labels");
-        const labels = [
-            { x: this.stageDist.swim / 2, text: 'Swim', class: 'x-label-swim' },
-            { x: (this.stageDist.swim + this.stageDist.t1) / 2, text: 'T1', class: 'x-label-t1' },
-            { x: (this.stageDist.t1 + this.stageDist.bike) / 2, text: 'Bike', class: 'x-label-bike' },
-            { x: (this.stageDist.bike + this.stageDist.t2) / 2, text: 'T2', class: 'x-label-t2' },
-            { x: (this.stageDist.t2 + 100) / 2, text: 'Run', class: 'x-label-run' }
-        ];
-        
-        labels.forEach(label => {
-            xLabels.append("text")
-                .attr("class", label.class)
-                .attr("x", this.xScale(label.x))
-                .attr("y", isMobile ? 25 : 30)
-                .style("text-anchor", "middle")
-                .style("font-size", isMobile ? "10px" : "12px")
-                .style("fill", "black")
-                .text(label.text);
-        });
-        
-        // Customize y-axis for time format
-        g.select('.y-axis')
-            .call(d3.axisLeft(this.yScale)
-                .tickFormat(d => {
-                    const absD = Math.abs(d);
-                    if (isMobile) {
-                        return Math.floor(absD / 60).toString();
-                    }
-                    return secondsToTime(absD);
-                })
-                .ticks(isMobile ? 5 : undefined)
-            );
     }
     
     drawTransitionLines(g, height) {
@@ -279,7 +642,7 @@ export class DevelopmentChart extends BaseChart {
     }
     
     drawAthletePaths(chartContent) {
-        this.chartData.forEach((athlete, index) => {
+        this.chartData.forEach((athlete) => {
             const isVisible = this.athleteVisibility[athlete.name] !== false;
             const strokeDasharray = this.getStrokeDasharray(athlete.status);
             
@@ -301,11 +664,13 @@ export class DevelopmentChart extends BaseChart {
                 .attr("d", this.lineGenerator)
                 .attr("fill", "none")
                 .attr("stroke", this.colorScale(athlete.name))
+                .attr("stroke-width", 1.5)
+                .attr("opacity", 0.4)
                 .attr("stroke-dasharray", strokeDasharray)
                 .attr("pointer-events", "none")
                 .classed("hidden", !isVisible);
             
-            // Add hover events to hit area
+            // Add hover events
             this.addPathHoverEvents(hitArea, athlete);
             
             // Draw circles at each stage point
@@ -324,12 +689,13 @@ export class DevelopmentChart extends BaseChart {
             
             const athleteName = athlete.athlete.baseName || athlete.name.replace(/ \([^)]*\)$/, '');
             const finishTime = athlete.athlete.actualTotalTime || 0;
-            const timeDiff = Math.abs(athlete.values[athlete.values.length - 1].timeBehind);
+            const lastPoint = athlete.values[athlete.values.length - 1];
+            const timeDiff = lastPoint.timeBehind;
             
             const content = `
                 <strong>${athleteName} (${athlete.athlete.finalRank || 'N/A'}) ${athlete.athlete.country}</strong><br/>
                 Finish Time: ${secondsToTime(finishTime)}<br/>
-                ${timeDiff > 0 ? `Behind Leader: ${secondsToTime(timeDiff)}` : 'Race Leader'}
+                ${timeDiff > 0 ? `Behind Leader: ${secondsToTime(timeDiff)}` : 'Race Winner'}
             `;
             
             tooltipManager.show(content, window.innerWidth - 250, event.pageY);
@@ -351,10 +717,10 @@ export class DevelopmentChart extends BaseChart {
             const circle = chartContent.append("circle")
                 .attr("class", `athlete-circle athlete-circle-${athlete.athleteIndex}`)
                 .attr("data-x", point.distance)
-                .attr("data-y", -point.timeBehind)
+                .attr("data-y", point.timeBehind)
                 .attr("data-stage", point.stage)
                 .attr("cx", this.xScale(point.distance))
-                .attr("cy", this.yScale(-point.timeBehind))
+                .attr("cy", this.yScale(point.timeBehind))
                 .attr("r", 4)
                 .attr("fill", this.colorScale(athlete.name))
                 .style("cursor", "pointer")
@@ -379,18 +745,10 @@ export class DevelopmentChart extends BaseChart {
                     .attr("opacity", 1);
                 d3.select(event.target).attr("r", 6);
                 
-                // Calculate leader time at this stage
-                const leaderTime = Math.min(...this.chartData
-                    .filter(a => a.values.some(v => v.stage === point.stage))
-                    .map(a => {
-                        const stageData = a.values.find(v => v.stage === point.stage);
-                        return stageData ? stageData.cumTime : Infinity;
-                    }));
-                
-                const timeBehindLeader = point.cumTime - leaderTime;
+                const leaderTimeAtStage = this.getLeaderTimeAtStage(point.stage);
+                const timeBehindLeader = point.cumTime - leaderTimeAtStage;
                 const content = tooltipManager.stagePoint(athlete.athlete, point.stage, point.cumTime, timeBehindLeader);
                 
-                // Position tooltip - check if near right edge
                 const isNearRightEdge = point.stage === 'Finish' || this.xScale(point.distance) > this.dimensions.width * 0.8;
                 tooltipManager.show(content, event.pageX, event.pageY, { preferLeft: isNearRightEdge });
             })
@@ -404,19 +762,27 @@ export class DevelopmentChart extends BaseChart {
         });
     }
     
+    getLeaderTimeAtStage(stage) {
+        switch(stage) {
+            case 'Swim': return this.stageLeaderTimes.swim;
+            case 'T1': return this.stageLeaderTimes.t1;
+            case 'Bike': return this.stageLeaderTimes.bike;
+            case 'T2': return this.stageLeaderTimes.t2;
+            case 'Finish': return this.stageLeaderTimes.finish;
+            default: return 0;
+        }
+    }
+    
     drawTeamHighlights() {
         if (!this.g || !this.chartData) return;
         
-        // Remove existing highlights
         this.g.selectAll(".team-highlight-path").remove();
         
-        // Find selected countries
         const selectedCountries = Object.keys(this.countryVisibility)
             .filter(country => this.countryVisibility[country] === 'selected');
         
         if (selectedCountries.length === 0) return;
         
-        // Create highlight layer
         let highlightLayer = this.g.select(".team-highlight-layer");
         if (highlightLayer.empty()) {
             highlightLayer = this.g.select(".chart-content")
@@ -425,7 +791,6 @@ export class DevelopmentChart extends BaseChart {
                 .attr("clip-path", "url(#chart-clip)");
         }
         
-        // Draw highlights for selected countries
         selectedCountries.forEach(country => {
             const teamColor = this.getTeamColor(country);
             
@@ -453,8 +818,6 @@ export class DevelopmentChart extends BaseChart {
         return this.teamColors[country];
     }
 
-        
-
     update() {
         if (!this.xScale || !this.yScale || !this.chartData) return;
         
@@ -462,10 +825,9 @@ export class DevelopmentChart extends BaseChart {
             const bounds = this.sectionBounds[this.currentSection];
             if (!bounds) return;
             
-            // Update X scale based on section
             this.xScale.domain([bounds.start, bounds.end]);
             
-            // Calculate relevant Y range ONLY for VISIBLE athletes
+            // Calculate Y range for visible athletes in this section
             let relevantData = [];
             this.chartData.forEach(athlete => {
                 const isVisible = this.athleteVisibility[athlete.name] !== false;
@@ -478,52 +840,57 @@ export class DevelopmentChart extends BaseChart {
                 }
             });
             
-            // If we have data, scale to it, otherwise use defaults
             if (relevantData.length > 0) {
                 const minTime = d3.min(relevantData);
                 const maxTime = d3.max(relevantData);
-                // Add padding to make the chart more readable
                 const padding = Math.max(5, (maxTime - minTime) * 0.1);
-                this.yScale.domain([-(maxTime + padding), Math.max(10, -minTime + padding)]);
+                this.yScale.domain([Math.max(0, minTime - padding), maxTime + padding]);
             } else {
-                // No visible athletes, use original scale
                 this.yScale.domain(this.originalYScale.domain());
             }
         }
         
-        // Animate updates
         const duration = 750;
         const isMobile = responsiveManager.isMobile;
         
-        // Update axes
-        this.g.select(".x-axis")
-            .transition()
-            .duration(duration)
-            .call(d3.axisBottom(this.xScale).tickFormat(""));
+        // Update axes (for standard chart)
+        if (!this.useScrollable) {
+            this.g.select(".x-axis")
+                .transition()
+                .duration(duration)
+                .call(d3.axisBottom(this.xScale).tickFormat(""));
+            
+            this.g.select(".y-axis")
+                .transition()
+                .duration(duration)
+                .call(d3.axisLeft(this.yScale)
+                    .tickFormat(d => {
+                        if (d === 0) return 'Leader';
+                        return isMobile ? Math.floor(d / 60).toString() : secondsToTime(d);
+                    })
+                    .ticks(isMobile ? 5 : 10)
+                );
+            
+            // Update grids
+            this.g.select(".grid-x")
+                .transition()
+                .duration(duration)
+                .call(d3.axisBottom(this.xScale).tickSize(-this.dimensions.height).tickFormat(""));
+            
+            this.g.select(".grid-y")
+                .transition()
+                .duration(duration)
+                .call(d3.axisLeft(this.yScale).tickSize(-this.dimensions.width).tickFormat(""));
+        }
         
-        this.g.select(".y-axis")
-            .transition()
-            .duration(duration)
-            .call(d3.axisLeft(this.yScale)
-                .tickFormat(d => {
-                    const absD = Math.abs(d);
-                    return isMobile ? Math.floor(absD / 60).toString() : secondsToTime(absD);
-                })
-                .ticks(isMobile ? 5 : undefined)
-            );
+        // Update x-axis header labels and dividers for scrollable chart
+        if (this.useScrollable && this.headerG) {
+            this.updateXAxisLabelsScrollable(this.headerG);
+        } else if (!this.useScrollable) {
+            this.updateXAxisLabels(this.g.select('.x-labels'));
+        }
         
-        // Update grids
-        this.g.select(".grid-x")
-            .transition()
-            .duration(duration)
-            .call(d3.axisBottom(this.xScale).tickSize(-this.dimensions.height).tickFormat(""));
-        
-        this.g.select(".grid-y")
-            .transition()
-            .duration(duration)
-            .call(d3.axisLeft(this.yScale).tickSize(-this.dimensions.width).tickFormat(""));
-        
-        // Update transition lines
+        // Update transition lines (grid lines at T1/T2)
         const transitionUpdates = [
             { class: '.transition-line-t1-start', pos: this.stageDist.swim },
             { class: '.transition-line-t1-end', pos: this.stageDist.t1 },
@@ -539,10 +906,28 @@ export class DevelopmentChart extends BaseChart {
                 .attr("x2", this.xScale(trans.pos));
         });
         
-        // Update line generator with current scales
+        // Update scrollable grid lines
+        if (this.useScrollable) {
+            const gridUpdates = [
+                { class: '.grid-line-swim', pos: this.stageDist.swim },
+                { class: '.grid-line-t1', pos: this.stageDist.t1 },
+                { class: '.grid-line-bike', pos: this.stageDist.bike },
+                { class: '.grid-line-t2', pos: this.stageDist.t2 }
+            ];
+            
+            gridUpdates.forEach(item => {
+                this.g.select(item.class)
+                    .transition()
+                    .duration(duration)
+                    .attr("x1", this.xScale(item.pos))
+                    .attr("x2", this.xScale(item.pos));
+            });
+        }
+        
+        // Update line generator
         this.lineGenerator
             .x(d => this.xScale(d.distance))
-            .y(d => this.yScale(-d.timeBehind));
+            .y(d => this.yScale(d.timeBehind));
         
         // Update paths
         this.g.select(".chart-content").selectAll(".athlete-path")
@@ -555,7 +940,7 @@ export class DevelopmentChart extends BaseChart {
             .duration(duration)
             .attr("d", this.lineGenerator);
         
-        // Update circles with proper context
+        // Update circles
         const self = this;
         this.g.select(".chart-content").selectAll(".athlete-circle")
             .transition()
@@ -572,17 +957,85 @@ export class DevelopmentChart extends BaseChart {
         // Update team highlights
         this.drawTeamHighlights();
         
-        // Update x-axis labels and title based on section
+        // Update main x-axis label (for standard chart)
+        if (!this.useScrollable) {
+            this.updateMainXAxisLabel();
+        }
+    }
+    
+    updateXAxisLabelsScrollable(container) {
+        const bounds = this.sectionBounds[this.currentSection];
+        if (!bounds) return;
+        
+        const labels = ['swim', 't1', 'bike', 't2', 'run'];
+        const labelData = {
+            'swim': { pos: this.stageDist.swim / 2, text: 'SWIM' },
+            't1': { pos: (this.stageDist.swim + this.stageDist.t1) / 2, text: 'T1' },
+            'bike': { pos: (this.stageDist.t1 + this.stageDist.bike) / 2, text: 'BIKE' },
+            't2': { pos: (this.stageDist.bike + this.stageDist.t2) / 2, text: 'T2' },
+            'run': { pos: (this.stageDist.t2 + 100) / 2, text: 'RUN' }
+        };
+        
+        // Update label positions and visibility
+        labels.forEach(label => {
+            const data = labelData[label];
+            const isInView = data.pos >= bounds.start && data.pos <= bounds.end;
+            
+            container.select(`.x-label-${label}`)
+                .transition()
+                .duration(750)
+                .attr("x", this.xScale(data.pos))
+                .style("display", this.currentSection === 'all' || isInView ? "block" : "none");
+        });
+        
+        // Update header dividers
+        const dividerPositions = [0, this.stageDist.swim, this.stageDist.t1, this.stageDist.bike, this.stageDist.t2, 100];
+        dividerPositions.forEach(pos => {
+            container.select(`.header-divider-${pos}`)
+                .transition()
+                .duration(750)
+                .attr("x1", this.xScale(pos))
+                .attr("x2", this.xScale(pos));
+        });
+        
+        // Update header background
+        container.select('.header-bg')
+            .transition()
+            .duration(750)
+            .attr('width', this.dimensions.width);
+    }
+    
+    updateXAxisLabels(container) {
+        const bounds = this.sectionBounds[this.currentSection];
+        if (!bounds) return;
+        
+        const labels = ['swim', 't1', 'bike', 't2', 'run'];
+        const labelData = {
+            'swim': { pos: this.stageDist.swim / 2, text: 'Swim' },
+            't1': { pos: (this.stageDist.swim + this.stageDist.t1) / 2, text: 'T1' },
+            'bike': { pos: (this.stageDist.t1 + this.stageDist.bike) / 2, text: 'Bike' },
+            't2': { pos: (this.stageDist.bike + this.stageDist.t2) / 2, text: 'T2' },
+            'run': { pos: (this.stageDist.t2 + 100) / 2, text: 'Run' }
+        };
+        
+        labels.forEach(label => {
+            const data = labelData[label];
+            const isInView = data.pos >= bounds.start && data.pos <= bounds.end;
+            
+            container.select(`.x-label-${label}`)
+                .transition()
+                .duration(750)
+                .attr("x", this.xScale(data.pos))
+                .style("display", this.currentSection === 'all' || isInView ? "block" : "none");
+        });
+    }
+    
+    updateMainXAxisLabel() {
         if (this.currentSection === 'all') {
-            this.g.selectAll(".x-labels text").style("display", "block");
             this.g.select(".x-axis-label").text("Race Progress");
         } else if (this.currentSection === 'zoom') {
-            this.g.selectAll(".x-labels text").style("display", "none");
             this.g.select(".x-axis-label").text("Race Progress (Zoomed)");
         } else {
-            this.g.selectAll(".x-labels text").style("display", "none");
-            
-            // Update label with segment leader info
             let leader, time, section;
             switch(this.currentSection) {
                 case 'swim':
@@ -620,206 +1073,208 @@ export class DevelopmentChart extends BaseChart {
         }
     }
 
-    // Replace the enableZoomMode method with this fixed version:
-
     enableZoomMode() {
-        this.currentSection = 'zoom';
-        this.zoomMode = true;
+        // this.currentSection = 'zoom';
+        // this.zoomMode = true;
         
-        const zoomHint = document.getElementById('zoomHint');
-        if (zoomHint) {
-            zoomHint.classList.add('active');
-            zoomHint.innerHTML = 'Hold <strong>Shift</strong> and drag to select area to zoom';
-            zoomHint.style.background = 'rgba(102, 126, 234, 0.95)';
-        }
+        // const zoomHint = document.getElementById('zoomHint');
+        // if (zoomHint) {
+        //     zoomHint.classList.add('active');
+        //     zoomHint.innerHTML = 'Hold <strong>Shift</strong> and drag to select area to zoom';
+        //     zoomHint.style.background = 'rgba(102, 126, 234, 0.95)';
+        // }
         
-        if (!this.svg || !this.dimensions) return;
+        // if (!this.svg || !this.dimensions) return;
         
-        const margin = this.dimensions.margin;
-        let isDragging = false;
-        let overlayActive = false;
-        let zoomRect = null;
-        let zoomStartX = null;
-        let zoomStartY = null;
+        // const margin = this.dimensions.margin;
+        // let isDragging = false;
+        // let overlayActive = false;
+        // let zoomRect = null;
+        // let zoomStartX = null;
+        // let zoomStartY = null;
         
-        // Remove any existing overlay
-        this.svg.select(".zoom-overlay").remove();
-        this.svg.select(".zoom-selection").remove();
+        // // Remove any existing overlay
+        // this.svg.select(".zoom-overlay").remove();
+        // this.svg.select(".zoom-selection").remove();
         
-        const zoomOverlay = this.svg.append("rect")
-            .attr("class", "zoom-overlay")
-            .attr("x", margin.left)
-            .attr("y", margin.top)
-            .attr("width", this.dimensions.width)
-            .attr("height", this.dimensions.height)
-            .style("fill", "none")
-            .style("pointer-events", "none")
-            .style("cursor", "crosshair");
+        // const zoomOverlay = this.svg.append("rect")
+        //     .attr("class", "zoom-overlay")
+        //     .attr("x", margin.left)
+        //     .attr("y", margin.top)
+        //     .attr("width", this.dimensions.width)
+        //     .attr("height", this.dimensions.height)
+        //     .style("fill", "none")
+        //     .style("pointer-events", "none")
+        //     .style("cursor", "crosshair");
         
-        const svgNode = this.svg.node();
-        const self = this;
+        // const svgNode = this.svg.node();
+        // const self = this;
         
-        // Store handlers so we can remove them later
-        this.zoomKeydownHandler = function(event) {
-            if (event.key === 'Shift' && self.zoomMode && !isDragging) {
-                zoomOverlay.style("pointer-events", "all").classed("active", true);
-                overlayActive = true;
-                if (zoomHint) {
-                    zoomHint.innerHTML = '✓ Shift held - Drag to select zoom area';
-                    zoomHint.style.background = 'rgba(40, 167, 69, 0.95)';
-                }
-            }
-        };
+        // // Store handlers so we can remove them later
+        // this.zoomKeydownHandler = function(event) {
+        //     if (event.key === 'Shift' && self.zoomMode && !isDragging) {
+        //         zoomOverlay.style("pointer-events", "all").classed("active", true);
+        //         overlayActive = true;
+        //         if (zoomHint) {
+        //             zoomHint.innerHTML = '✓ Shift held - Drag to select zoom area';
+        //             zoomHint.style.background = 'rgba(40, 167, 69, 0.95)';
+        //         }
+        //     }
+        // };
         
-        this.zoomKeyupHandler = function(event) {
-            if (event.key === 'Shift' && !isDragging) {
-                zoomOverlay.style("pointer-events", "none").classed("active", false);
-                overlayActive = false;
-                if (zoomHint) {
-                    zoomHint.innerHTML = 'Hold <strong>Shift</strong> and drag to select area to zoom';
-                    zoomHint.style.background = 'rgba(102, 126, 234, 0.95)';
-                }
-            }
-        };
+        // this.zoomKeyupHandler = function(event) {
+        //     if (event.key === 'Shift' && !isDragging) {
+        //         zoomOverlay.style("pointer-events", "none").classed("active", false);
+        //         overlayActive = false;
+        //         if (zoomHint) {
+        //             zoomHint.innerHTML = 'Hold <strong>Shift</strong> and drag to select area to zoom';
+        //             zoomHint.style.background = 'rgba(102, 126, 234, 0.95)';
+        //         }
+        //     }
+        // };
         
-        this.zoomMousemoveHandler = function(event) {
-            if (!self.zoomMode || !isDragging || !zoomRect) return;
+        // this.zoomMousemoveHandler = function(event) {
+        //     if (!self.zoomMode || !isDragging || !zoomRect) return;
             
-            const rect = svgNode.getBoundingClientRect();
-            const x = event.clientX - rect.left;
-            const y = event.clientY - rect.top;
+        //     const rect = svgNode.getBoundingClientRect();
+        //     const x = event.clientX - rect.left;
+        //     const y = event.clientY - rect.top;
             
-            const currentX = Math.min(Math.max(margin.left, x), margin.left + self.dimensions.width);
-            const currentY = Math.min(Math.max(margin.top, y), margin.top + self.dimensions.height);
+        //     const currentX = Math.min(Math.max(margin.left, x), margin.left + self.dimensions.width);
+        //     const currentY = Math.min(Math.max(margin.top, y), margin.top + self.dimensions.height);
             
-            const startX = zoomStartX + margin.left;
-            const startY = zoomStartY + margin.top;
+        //     const startX = zoomStartX + margin.left;
+        //     const startY = zoomStartY + margin.top;
             
-            const width = Math.abs(currentX - startX);
-            const height = Math.abs(currentY - startY);
+        //     const width = Math.abs(currentX - startX);
+        //     const height = Math.abs(currentY - startY);
             
-            zoomRect
-                .attr("x", Math.min(currentX, startX))
-                .attr("y", Math.min(currentY, startY))
-                .attr("width", width)
-                .attr("height", height);
-        };
+        //     zoomRect
+        //         .attr("x", Math.min(currentX, startX))
+        //         .attr("y", Math.min(currentY, startY))
+        //         .attr("width", width)
+        //         .attr("height", height);
+        // };
         
-        this.zoomMouseupHandler = function(event) {
-            if (!self.zoomMode || !isDragging || !zoomRect) return;
+        // this.zoomMouseupHandler = function(event) {
+        //     if (!self.zoomMode || !isDragging || !zoomRect) return;
             
-            isDragging = false;
+        //     isDragging = false;
             
-            const rect = svgNode.getBoundingClientRect();
-            const x = event.clientX - rect.left;
-            const y = event.clientY - rect.top;
+        //     const rect = svgNode.getBoundingClientRect();
+        //     const x = event.clientX - rect.left;
+        //     const y = event.clientY - rect.top;
             
-            const endX = Math.min(Math.max(margin.left, x), margin.left + self.dimensions.width) - margin.left;
-            const endY = Math.min(Math.max(margin.top, y), margin.top + self.dimensions.height) - margin.top;
+        //     const endX = Math.min(Math.max(margin.left, x), margin.left + self.dimensions.width) - margin.left;
+        //     const endY = Math.min(Math.max(margin.top, y), margin.top + self.dimensions.height) - margin.top;
             
-            // Check if drag was significant (at least 20px in both directions)
-            if (Math.abs(endX - zoomStartX) > 20 && Math.abs(endY - zoomStartY) > 20) {
-                const x1 = Math.min(zoomStartX, endX);
-                const x2 = Math.max(zoomStartX, endX);
-                const y1 = Math.min(zoomStartY, endY);
-                const y2 = Math.max(zoomStartY, endY);
+        //     // Check if drag was significant (at least 20px in both directions)
+        //     if (Math.abs(endX - zoomStartX) > 20 && Math.abs(endY - zoomStartY) > 20) {
+        //         const x1 = Math.min(zoomStartX, endX);
+        //         const x2 = Math.max(zoomStartX, endX);
+        //         const y1 = Math.min(zoomStartY, endY);
+        //         const y2 = Math.max(zoomStartY, endY);
                 
-                // Convert pixel coordinates to data coordinates
-                const xDomain = [
-                    self.xScale.invert(x1),
-                    self.xScale.invert(x2)
-                ];
-                const yDomain = [
-                    self.yScale.invert(y2),  // Inverted because y-axis is flipped
-                    self.yScale.invert(y1)
-                ];
+        //         // Convert pixel coordinates to data coordinates
+        //         const xDomain = [
+        //             self.xScale.invert(x1),
+        //             self.xScale.invert(x2)
+        //         ];
+        //         const yDomain = [
+        //             self.yScale.invert(y2),  // Inverted because y-axis is flipped
+        //             self.yScale.invert(y1)
+        //         ];
                 
-                // Apply new domains
-                self.xScale.domain(xDomain);
-                self.yScale.domain(yDomain);
+        //         // Apply new domains
+        //         self.xScale.domain(xDomain);
+        //         self.yScale.domain(yDomain);
                 
-                // Update the chart
-                self.update();
+        //         // Update the chart
+        //         self.update();
                 
-                if (zoomHint) {
-                    zoomHint.innerHTML = 'Zoomed! Hold <strong>Shift</strong> to zoom again or click Reset';
-                }
-            }
+        //         if (zoomHint) {
+        //             zoomHint.innerHTML = 'Zoomed! Hold <strong>Shift</strong> to zoom again or click Reset';
+        //         }
+        //     }
             
-            // Clean up
-            self.svg.select(".zoom-selection").remove();
-            if (!event.shiftKey) {
-                zoomOverlay.style("pointer-events", "none").classed("active", false);
-                overlayActive = false;
-                if (zoomHint) {
-                    zoomHint.innerHTML = 'Hold <strong>Shift</strong> and drag to select area to zoom';
-                    zoomHint.style.background = 'rgba(102, 126, 234, 0.95)';
-                }
-            }
-            zoomRect = null;
-            zoomStartX = null;
-            zoomStartY = null;
-        };
+        //     // Clean up
+        //     self.svg.select(".zoom-selection").remove();
+        //     if (!event.shiftKey) {
+        //         zoomOverlay.style("pointer-events", "none").classed("active", false);
+        //         overlayActive = false;
+        //         if (zoomHint) {
+        //             zoomHint.innerHTML = 'Hold <strong>Shift</strong> and drag to select area to zoom';
+        //             zoomHint.style.background = 'rgba(102, 126, 234, 0.95)';
+        //         }
+        //     }
+        //     zoomRect = null;
+        //     zoomStartX = null;
+        //     zoomStartY = null;
+        // };
         
-        // Attach event listeners
-        d3.select(window).on("keydown.zoom", this.zoomKeydownHandler);
-        d3.select(window).on("keyup.zoom", this.zoomKeyupHandler);
-        d3.select(window).on("mousemove.zoom", this.zoomMousemoveHandler);
-        d3.select(window).on("mouseup.zoom", this.zoomMouseupHandler);
+        // // Attach event listeners
+        // d3.select(window).on("keydown.zoom", this.zoomKeydownHandler);
+        // d3.select(window).on("keyup.zoom", this.zoomKeyupHandler);
+        // d3.select(window).on("mousemove.zoom", this.zoomMousemoveHandler);
+        // d3.select(window).on("mouseup.zoom", this.zoomMouseupHandler);
         
-        zoomOverlay.on("mousedown", function(event) {
-            if (!self.zoomMode || !overlayActive) return;
+        // zoomOverlay.on("mousedown", function(event) {
+        //     if (!self.zoomMode || !overlayActive) return;
             
-            isDragging = true;
-            const [x, y] = d3.pointer(event, this);
-            zoomStartX = x - margin.left;
-            zoomStartY = y - margin.top;
+        //     isDragging = true;
+        //     const [x, y] = d3.pointer(event, this);
+        //     zoomStartX = x - margin.left;
+        //     zoomStartY = y - margin.top;
             
-            self.svg.select(".zoom-selection").remove();
+        //     self.svg.select(".zoom-selection").remove();
             
-            zoomRect = self.svg.append("rect")
-                .attr("class", "zoom-selection")
-                .attr("x", x)
-                .attr("y", y)
-                .attr("width", 0)
-                .attr("height", 0);
+        //     zoomRect = self.svg.append("rect")
+        //         .attr("class", "zoom-selection")
+        //         .attr("x", x)
+        //         .attr("y", y)
+        //         .attr("width", 0)
+        //         .attr("height", 0);
             
-            event.preventDefault();
-        });
+        //     event.preventDefault();
+        // });
     }
 
     // Update disableZoomMode to clean up properly:
 
     disableZoomMode() {
-        this.zoomMode = false;
+        // this.zoomMode = false;
         
-        const zoomHint = document.getElementById('zoomHint');
-        if (zoomHint) {
-            zoomHint.classList.remove('active');
-        }
+        // const zoomHint = document.getElementById('zoomHint');
+        // if (zoomHint) {
+        //     zoomHint.classList.remove('active');
+        // }
         
-        if (this.svg) {
-            this.svg.select(".zoom-overlay").remove();
-            this.svg.select(".zoom-selection").remove();
-        }
+        // if (this.svg) {
+        //     this.svg.select(".zoom-overlay").remove();
+        //     this.svg.select(".zoom-selection").remove();
+        // }
         
-        // Remove all event listeners
-        d3.select(window).on("mousemove.zoom", null);
-        d3.select(window).on("mouseup.zoom", null);
-        d3.select(window).on("keydown.zoom", null);
-        d3.select(window).on("keyup.zoom", null);
+        // // Remove all event listeners
+        // d3.select(window).on("mousemove.zoom", null);
+        // d3.select(window).on("mouseup.zoom", null);
+        // d3.select(window).on("keydown.zoom", null);
+        // d3.select(window).on("keyup.zoom", null);
         
-        // Clear handler references
-        this.zoomKeydownHandler = null;
-        this.zoomKeyupHandler = null;
-        this.zoomMousemoveHandler = null;
-        this.zoomMouseupHandler = null;
+        // // Clear handler references
+        // this.zoomKeydownHandler = null;
+        // this.zoomKeyupHandler = null;
+        // this.zoomMousemoveHandler = null;
+        // this.zoomMouseupHandler = null;
     }
+
 
     showSection(section) {
         if (section === 'zoom') {
+            if (this.useScrollable) {
+                alert('Zoom mode is not available in scrollable view.');
+                return;
+            }
             this.enableZoomMode();
-            // Don't call update here - zoom mode will handle its own updates
         } else {
             this.disableZoomMode();
             this.currentSection = section;
@@ -827,16 +1282,12 @@ export class DevelopmentChart extends BaseChart {
         }
     }
 
-
-
-
     showAllAthletes(show) {
         const countries = [...new Set(this.data.map(d => d.country))];
         countries.forEach(country => {
-            this.countryVisibility[country] = show;  // Reset to boolean, not 'selected'
+            this.countryVisibility[country] = show;
         });
         
-        // Reset team colors when hiding all
         if (!show) {
             this.teamColors = {};
             this.teamColorIndex = 0;
@@ -850,8 +1301,9 @@ export class DevelopmentChart extends BaseChart {
         });
         
         this.update();
-        this.drawTeamHighlights();  // This will clear highlights since no countries are 'selected'
-    }    
+        this.drawTeamHighlights();
+    }
+    
     toggleAthlete(athleteName, athleteIndex) {
         this.athleteVisibility[athleteName] = !this.athleteVisibility[athleteName];
         const isVisible = this.athleteVisibility[athleteName];
@@ -891,6 +1343,7 @@ export class DevelopmentChart extends BaseChart {
         this.update();
         this.drawTeamHighlights();
     }
+    
     resetZoom() {
         if (this.originalXScale && this.originalYScale) {
             this.disableZoomMode();
@@ -900,5 +1353,4 @@ export class DevelopmentChart extends BaseChart {
             this.update();
         }
     }
-    
 }
