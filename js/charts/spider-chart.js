@@ -1,7 +1,8 @@
 import { BaseChart } from './base-chart.js';
 import { ChartConfig } from '../config/chart-config.js';
-import { tooltipManager } from '../ui/tooltips.js';
+import { RaceConfig } from '../config/race-config.js';
 import { responsiveManager } from '../utils/responsive.js';
+import { secondsToTime } from '../utils/formatters.js';
 
 export class SpiderChart extends BaseChart {
     constructor(containerId) {
@@ -26,14 +27,43 @@ export class SpiderChart extends BaseChart {
         
         this.clear();
         
-        // Force container centering
         const container = document.getElementById(this.containerId);
-        container.style.display = 'flex';
-        container.style.justifyContent = 'center';
-        container.style.alignItems = 'center';
-        container.style.minHeight = '400px';
+        const isMobile = responsiveManager.isMobile || window.innerWidth < 768;
         
-        const { svg, g, width, height, margin } = this.createSVG();
+        // Setup container based on screen size
+        if (isMobile) {
+            container.style.display = 'flex';
+            container.style.flexDirection = 'column';
+            container.style.alignItems = 'center';
+        } else {
+            container.style.display = 'flex';
+            container.style.flexDirection = 'row';
+            container.style.alignItems = 'flex-start';
+            container.style.gap = '20px';
+        }
+        
+        // Create chart container
+        const chartContainer = document.createElement('div');
+        chartContainer.id = `${this.containerId}-chart`;
+        chartContainer.style.flex = isMobile ? '1' : '0 0 50%';
+        chartContainer.style.display = 'flex';
+        chartContainer.style.justifyContent = 'center';
+        chartContainer.style.alignItems = 'center';
+        chartContainer.style.minHeight = isMobile ? '300px' : '400px';
+        container.appendChild(chartContainer);
+        
+        // Create table container
+        const tableContainer = document.createElement('div');
+        tableContainer.id = `${this.containerId}-table`;
+        tableContainer.style.flex = isMobile ? '1' : '0 0 50%';
+        tableContainer.style.overflowX = 'auto';
+        tableContainer.style.marginTop = isMobile ? '20px' : '0';
+        tableContainer.style.maxHeight = isMobile ? 'none' : '500px';
+        tableContainer.style.overflowY = 'auto';
+        tableContainer.style.width = '100%';
+        container.appendChild(tableContainer);
+        
+        const { svg, g, width, height, margin } = this.createSVGInContainer(chartContainer);
         const radius = Math.min(width, height) / 2;
         
         // Center the chart
@@ -57,6 +87,34 @@ export class SpiderChart extends BaseChart {
         
         // Draw athlete areas
         this.drawAthleteAreas(g, rScale, angleSlice);
+        
+        // Draw comparison table
+        this.drawComparisonTable(tableContainer);
+    }
+    
+    createSVGInContainer(container) {
+        const { width: containerWidth, height: containerHeight } = container.getBoundingClientRect();
+        const isMobile = responsiveManager.isMobile || window.innerWidth < 768;
+        
+        const margin = { top: 50, right: 50, bottom: 50, left: 50 };
+        const spiderSize = isMobile ? 300 : 400;
+        const width = Math.min(containerWidth || spiderSize, spiderSize) - margin.left - margin.right;
+        const height = Math.min(spiderSize, containerHeight || spiderSize) - margin.top - margin.bottom;
+        
+        const svg = d3.select(container)
+            .append("svg")
+            .attr("width", width + margin.left + margin.right)
+            .attr("height", height + margin.top + margin.bottom);
+        
+        const g = svg.append("g");
+        
+        this.svg = svg;
+        this.g = g;
+        this.width = width;
+        this.height = height;
+        this.margin = margin;
+        
+        return { svg, g, width, height, margin };
     }
     
     calculatePercentiles() {
@@ -187,16 +245,13 @@ export class SpiderChart extends BaseChart {
                 .style("stroke-dasharray", strokeDasharray)
                 .classed("hidden", !isVisible);
             
-            // Add hover events
+            // Add hover events for highlighting only
             area.on("mouseover", (event) => {
                 if (!this.athleteVisibility[athlete.name]) return;
                 
                 d3.select(event.target)
                     .style("fill-opacity", 0.4)
                     .style("stroke-width", 3);
-                
-                const content = tooltipManager.spiderAthlete(athlete);
-                tooltipManager.show(content, event.pageX, event.pageY);
             })
             .on("mouseout", (event) => {
                 if (!this.athleteVisibility[athlete.name]) return;
@@ -204,8 +259,6 @@ export class SpiderChart extends BaseChart {
                 d3.select(event.target)
                     .style("fill-opacity", 0.2)
                     .style("stroke-width", 2);
-                
-                tooltipManager.hide();
             });
             
             // Draw dots at vertices
@@ -226,6 +279,178 @@ export class SpiderChart extends BaseChart {
                 .style("fill", this.colorScale(athlete.name))
                 .classed("hidden", !isVisible);
         });
+    }
+    
+    drawComparisonTable(container) {
+        // Get visible athletes
+        const visibleAthletes = this.data.filter(a => this.athleteVisibility[a.name] === true);
+        
+        if (visibleAthletes.length === 0) {
+            container.innerHTML = '<p style="text-align: center; color: #666; padding: 20px;">Select athletes to compare their times and paces</p>';
+            return;
+        }
+        
+        // Create table
+        const table = document.createElement('table');
+        table.style.width = '100%';
+        table.style.borderCollapse = 'collapse';
+        table.style.fontSize = '13px';
+        
+        // Create header
+        const thead = document.createElement('thead');
+        const headerRow = document.createElement('tr');
+        
+        // Athlete name header
+        const nameHeader = document.createElement('th');
+        nameHeader.textContent = 'Athlete';
+        nameHeader.style.cssText = 'padding: 10px 8px; border: 1px solid #ddd; background: #f5f5f5; text-align: left; position: sticky; top: 0; z-index: 10;';
+        headerRow.appendChild(nameHeader);
+        
+        // Segment headers
+        this.axes.forEach(ax => {
+            const header = document.createElement('th');
+            header.textContent = ax.axis;
+            header.style.cssText = 'padding: 10px 8px; border: 1px solid #ddd; background: #f5f5f5; text-align: center; position: sticky; top: 0; z-index: 10;';
+            headerRow.appendChild(header);
+        });
+        
+        thead.appendChild(headerRow);
+        table.appendChild(thead);
+        
+        // Create body
+        const tbody = document.createElement('tbody');
+        
+        visibleAthletes.forEach(athlete => {
+            const row = document.createElement('tr');
+            
+            // Athlete name with color indicator
+            const nameCell = document.createElement('td');
+            nameCell.style.cssText = 'padding: 8px; border: 1px solid #ddd; white-space: nowrap;';
+            
+            const colorDot = document.createElement('span');
+            colorDot.style.cssText = `display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: ${this.colorScale(athlete.name)}; margin-right: 6px; vertical-align: middle;`;
+            nameCell.appendChild(colorDot);
+            
+            const nameText = document.createElement('span');
+            nameText.textContent = `${athlete.baseName || athlete.name.replace(/ \([^)]*\)$/, '')}`;
+            nameText.style.verticalAlign = 'middle';
+            nameCell.appendChild(nameText);
+            
+            const countryText = document.createElement('div');
+            countryText.textContent = athlete.country;
+            countryText.style.cssText = 'font-size: 11px; color: #666; margin-left: 16px;';
+            nameCell.appendChild(countryText);
+            
+            row.appendChild(nameCell);
+            
+            // Segment times (clickable to show pace)
+            this.axes.forEach(ax => {
+                const cell = document.createElement('td');
+                cell.style.cssText = 'padding: 8px; border: 1px solid #ddd; text-align: center; position: relative; -webkit-tap-highlight-color: transparent;';
+                
+                let actualValue;
+                if (ax.key === 'swimTime') actualValue = athlete.actualSwimTime;
+                else if (ax.key === 't1Time') actualValue = athlete.actualT1Time;
+                else if (ax.key === 'bikeTime') actualValue = athlete.actualBikeTime;
+                else if (ax.key === 't2Time') actualValue = athlete.actualT2Time;
+                else if (ax.key === 'runTime') actualValue = athlete.actualRunTime;
+                
+                if (actualValue && actualValue < 99 * 3600) {
+                    const timeStr = this.formatTime(actualValue);
+                    const rank = athlete[ax.rankKey];
+                    
+                    // Create time display
+                    const timeDisplay = document.createElement('div');
+                    timeDisplay.className = 'time-display';
+                    timeDisplay.textContent = timeStr;
+                    timeDisplay.style.fontWeight = '500';
+                    
+                    // Create rank display
+                    const rankDisplay = document.createElement('div');
+                    rankDisplay.className = 'rank-display';
+                    rankDisplay.textContent = rank ? `#${rank}` : '';
+                    rankDisplay.style.cssText = 'font-size: 11px; color: #666;';
+                    
+                    // Create pace display (hidden initially)
+                    const paceDisplay = document.createElement('div');
+                    paceDisplay.className = 'pace-display';
+                    paceDisplay.style.cssText = 'display: none; font-size: 11px; color: #0066cc; margin-top: 2px; font-weight: 500;';
+                    
+                    // Calculate pace based on segment type using RaceConfig
+                    let hasPace = false;
+                    if (ax.axis === 'Swim' && athlete.actualSwimTime) {
+                        const swimPace = RaceConfig.getSwimPace(athlete.actualSwimTime);
+                        paceDisplay.textContent = `${secondsToTime(swimPace)}/100m`;
+                        hasPace = true;
+                    } else if (ax.axis === 'Bike' && athlete.actualBikeTime) {
+                        const bikeSpeed = RaceConfig.getBikeSpeed(athlete.actualBikeTime);
+                        paceDisplay.textContent = `${bikeSpeed.toFixed(1)} km/hr`;
+                        hasPace = true;
+                    } else if (ax.axis === 'Run' && athlete.actualRunTime) {
+                        const runPace = RaceConfig.getRunPace(athlete.actualRunTime);
+                        const mins = Math.floor(runPace);
+                        const secs = Math.round((runPace % 1) * 60);
+                        paceDisplay.textContent = `${mins}:${secs.toString().padStart(2, '0')}/km`;
+                        hasPace = true;
+                    }
+                    
+                    cell.appendChild(timeDisplay);
+                    cell.appendChild(rankDisplay);
+                    cell.appendChild(paceDisplay);
+                    
+                    // Add click/touch handler to toggle pace
+                    if (hasPace) {
+                        cell.style.cursor = 'pointer';
+                        
+                        const togglePace = (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            const isShowing = paceDisplay.style.display !== 'none';
+                            paceDisplay.style.display = isShowing ? 'none' : 'block';
+                            cell.style.backgroundColor = isShowing ? '' : '#f0f8ff';
+                        };
+                        
+                        // Support both click and touch
+                        cell.addEventListener('click', togglePace);
+                        cell.addEventListener('touchend', togglePace);
+                        cell.title = 'Tap to show/hide pace';
+                    } else {
+                        cell.style.cursor = 'default';
+                    }
+                } else {
+                    cell.textContent = '-';
+                    cell.style.cursor = 'default';
+                }
+                
+                row.appendChild(cell);
+            });
+            
+            tbody.appendChild(row);
+        });
+        
+        table.appendChild(tbody);
+        container.innerHTML = '';
+        container.appendChild(table);
+        
+        // Add helper text
+        const helperText = document.createElement('p');
+        helperText.style.cssText = 'font-size: 11px; color: #888; text-align: center; margin-top: 8px;';
+        helperText.textContent = 'Tap on times to show/hide pace information';
+        container.appendChild(helperText);
+    }
+    
+    formatTime(seconds) {
+        if (!seconds || seconds >= 99 * 3600) return '-';
+        
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        const secs = Math.floor(seconds % 60);
+        
+        if (hours > 0) {
+            return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        } else {
+            return `${minutes}:${secs.toString().padStart(2, '0')}`;
+        }
     }
     
     toggleAthlete(athleteName) {
@@ -260,5 +485,12 @@ export class SpiderChart extends BaseChart {
             }
         });
         this.redraw();
+    }
+    
+    clear() {
+        const container = document.getElementById(this.containerId);
+        if (container) {
+            container.innerHTML = '';
+        }
     }
 }

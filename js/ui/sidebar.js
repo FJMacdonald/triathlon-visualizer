@@ -5,17 +5,12 @@ export class SidebarManager {
     constructor() {
         this.sidebar = document.getElementById('sidebar');
         this.content = document.getElementById('sidebarContent');
-        this.toggle = document.getElementById('sidebarToggle');
+        this.toggleBtn = document.getElementById('sidebarToggle'); // Renamed to avoid conflict
         this.mainContent = document.getElementById('mainContent');
         this.isOpen = false;
+        this.athleteVisibilityRef = null;
         
-        this.setupEventListeners();
-    }
-    
-    setupEventListeners() {
-        if (this.toggle) {
-            this.toggle.addEventListener('click', () => this.toggle());
-        }
+        // Don't setup listeners here - let main.js handle it
     }
     
     toggleSidebar() {
@@ -43,15 +38,15 @@ export class SidebarManager {
     }
     
     show() {
-        if (this.toggle) {
-            this.toggle.style.display = 'block';
+        if (this.toggleBtn) {
+            this.toggleBtn.style.display = 'block';
         }
     }
     
     hide() {
         this.close();
-        if (this.toggle) {
-            this.toggle.style.display = 'none';
+        if (this.toggleBtn) {
+            this.toggleBtn.style.display = 'none';
         }
     }
     
@@ -60,6 +55,7 @@ export class SidebarManager {
             this.content.innerHTML = html;
         }
     }
+    
     populateDevelopmentControls(data, config) {
         if (!data || !this.content) return;
         
@@ -74,8 +70,8 @@ export class SidebarManager {
             currentSection = 'all'
         } = config;
         
-        // Store colorScale for later use
         this.colorScale = colorScale;
+        this.athleteVisibilityRef = athleteVisibility;
         
         let html = '';
         
@@ -105,7 +101,6 @@ export class SidebarManager {
         
         html += '</div></div>';
         
-        // Athlete controls
         html += this.generateAthleteControls(data, {
             athleteVisibility,
             colorScale,
@@ -167,7 +162,6 @@ export class SidebarManager {
             const showAll = e.target.textContent === 'Show All';
             e.target.textContent = showAll ? 'Hide All' : 'Show All';
             if (onToggleAll) onToggleAll(showAll);
-            this.updateAllAthleteButtonsWithColors(showAll, athleteVisibility, colorScale);
         });
         
         this.content.querySelectorAll('[data-group]').forEach(btn => {
@@ -181,7 +175,6 @@ export class SidebarManager {
             btn.addEventListener('click', () => {
                 const athleteData = JSON.parse(btn.dataset.athlete);
                 if (onToggleAthlete) onToggleAthlete(athleteData.name, athleteData.index);
-                // Button state will be updated by main.js callback
             });
         });
         
@@ -198,12 +191,10 @@ export class SidebarManager {
         let html = '<div class="sidebar-section">';
         html += '<div class="sidebar-section-title">Athletes</div>';
         
-        // Toggle all button
         html += '<div style="margin-bottom: 15px;">';
         html += `<button class="btn toggle-all" id="${toggleBtnId}">Hide All</button>`;
         html += '</div>';
         
-        // Group selection
         html += '<div><strong>Groups:</strong></div>';
         html += '<div class="athlete-list" style="max-height: 120px; margin-bottom: 15px;">';
         
@@ -213,7 +204,6 @@ export class SidebarManager {
         
         html += '</div>';
         
-        // Individual athletes
         html += '<div style="margin-top: 15px; margin-bottom: 10px;"><strong>Individual Athletes:</strong></div>';
         html += '<div class="athlete-list">';
         
@@ -228,11 +218,10 @@ export class SidebarManager {
             const athleteIndex = data.indexOf(athlete);
             const isVisible = athleteVisibility[athlete.name] !== false;
             const color = colorScale(athlete.name);
-            const rank = athlete.finalRank ? `${athlete.finalRank}.` : '';
+            const rank = athlete.finalRank ?`${athlete.finalRank}.` : '';
             const flag = getFlag(athlete.country);
             const name = athlete.baseName || athlete.name.replace(/ \([^)]*\)$/, '');
             
-            // Store color and visibility state
             const bgColor = isVisible ? (color + '99') : '#cccccc';
             const opacity = isVisible ? '1' : '0.4';
             
@@ -247,7 +236,6 @@ export class SidebarManager {
         
         html += '</div>';
         
-        // Country selection
         html += '<div style="margin-top: 15px; margin-bottom: 10px;"><strong>Countries:</strong></div>';
         html += '<div class="country-list">';
         
@@ -264,13 +252,15 @@ export class SidebarManager {
         return html;
     }
 
-    updateAllAthleteButtonsWithColors(show, athleteVisibility, colorScale) {
-        // Update all athlete buttons
+    syncAllButtonStates(athleteVisibility) {
+        if (!this.content) return;
+        
         this.content.querySelectorAll('.athlete-btn').forEach(btn => {
             const athleteName = btn.dataset.athleteName;
             const color = btn.dataset.color;
+            const isVisible = athleteVisibility[athleteName] === true;
             
-            if (show) {
+            if (isVisible) {
                 btn.style.opacity = '1';
                 btn.style.backgroundColor = color + '99';
             } else {
@@ -279,14 +269,11 @@ export class SidebarManager {
             }
         });
         
-        // Update country buttons
-        this.content.querySelectorAll('.country-btn').forEach(btn => {
-            if (show) {
-                btn.style.opacity = '1';
-            } else {
-                btn.style.opacity = '0.4';
-            }
-        });
+        const hasAnyVisible = Object.values(athleteVisibility).some(v => v === true);
+        const toggleBtn = this.content.querySelector('#athleteToggleBtn, #spiderToggleBtn');
+        if (toggleBtn) {
+            toggleBtn.textContent = hasAnyVisible ? 'Hide All' : 'Show All';
+        }
     }
 
     updateAthleteButtonState(athleteName, isVisible) {
@@ -323,8 +310,6 @@ export class SidebarManager {
     }
 
     resetAllButtonStates(show) {
-        // This method is called when toggling all athletes
-        // We need the color information from the buttons themselves
         this.content.querySelectorAll('.athlete-btn').forEach(btn => {
             const color = btn.dataset.color;
             if (show) {
@@ -345,7 +330,6 @@ export class SidebarManager {
         });
     }
 
-    // Also update the Spider controls to use the same pattern
     populateSpiderControls(data, config) {
         if (!data || !this.content) return;
         
@@ -357,6 +341,9 @@ export class SidebarManager {
             athleteVisibility,
             colorScale
         } = config;
+        
+        this.colorScale = colorScale;
+        this.athleteVisibilityRef = athleteVisibility;
         
         let html = this.generateAthleteControls(data, {
             athleteVisibility,
@@ -373,18 +360,19 @@ export class SidebarManager {
         
         this.setContent(html);
         
-        // Add event listeners
         this.content.querySelector('#spiderToggleBtn')?.addEventListener('click', (e) => {
             const showAll = e.target.textContent === 'Show All';
             e.target.textContent = showAll ? 'Hide All' : 'Show All';
             if (onToggleAll) onToggleAll(showAll);
-            this.updateAllAthleteButtonsWithColors(showAll, athleteVisibility, colorScale);
+            this.syncAllButtonStates(athleteVisibility);
         });
         
         this.content.querySelectorAll('[data-group]').forEach(btn => {
             btn.addEventListener('click', () => {
                 const groupData = JSON.parse(btn.dataset.group);
                 if (onToggleGroup) onToggleGroup(groupData);
+                // Need to sync after group toggle
+                setTimeout(() => this.syncAllButtonStates(athleteVisibility), 50);
             });
         });
         
@@ -392,38 +380,28 @@ export class SidebarManager {
             btn.addEventListener('click', () => {
                 const athleteName = btn.dataset.athleteName;
                 if (onToggleAthlete) onToggleAthlete(athleteName);
-                // Toggle button state immediately
+                // Update this button immediately
                 const color = btn.dataset.color;
-                const isCurrentlyActive = btn.style.opacity !== '0.4';
-                if (isCurrentlyActive) {
-                    btn.style.opacity = '0.4';
-                    btn.style.backgroundColor = '#cccccc';
-                } else {
-                    btn.style.opacity = '1';
-                    btn.style.backgroundColor = color + '99';
-                }
+                const isCurrentlyVisible = btn.style.opacity !== '0.4';
+                const newVisibility = !isCurrentlyVisible;
+                btn.style.opacity = newVisibility ? '1' : '0.4';
+                btn.style.backgroundColor = newVisibility ? color + '99' : '#cccccc';
             });
         });
         
         this.content.querySelectorAll('[data-country]').forEach(btn => {
             btn.addEventListener('click', () => {
                 if (onToggleCountry) onToggleCountry(btn.dataset.country);
+                setTimeout(() => this.syncAllButtonStates(athleteVisibility), 50);
             });
         });
     }
-
-
-
     
     updateSectionButtons(activeSection) {
         this.content.querySelectorAll('[data-section]').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.section === activeSection);
         });
     }
-    
-
-    
-
 }
 
 export const sidebarManager = new SidebarManager();
