@@ -9,6 +9,7 @@ export class RankChart extends BaseChart {
         super(containerId, 'rank');
         this.stages = [];
         this.athletePositions = {};
+        this.rowHeight = 20; // Height per athlete row
     }
     
     draw() {
@@ -27,14 +28,91 @@ export class RankChart extends BaseChart {
             });
         const nonDsqData = this.data.filter(a => a.status !== 'DSQ');
         
-        // Create SVG
-        const { svg, g, width, height, margin } = this.createSVG();
+        this.drawScrollableChart(nonDsqData, dsqAthletes);
+    }
+    
+    drawScrollableChart(nonDsqData, dsqAthletes) {
+        const container = d3.select(this.container);
+        const containerWidth = container.node().getBoundingClientRect().width;
         const isMobile = responsiveManager.isMobile;
         
-        // Calculate stage proportions based on average times
-        const stageProportions = this.calculateStageProportions();
+        // Calculate dimensions - adjusted margins since Y label is outside
+        const margin = { top: 10, right: 100, bottom: 10, left: 35 };
+        const width = containerWidth - margin.left - margin.right - 30; // Extra space for external label
+        const totalAthletes = this.data.length;
+        const fullHeight = totalAthletes * this.rowHeight;
+        
+        // Viewport height based on screen size
+        const maxViewportHeight = isMobile ? 
+            Math.min(window.innerHeight * 0.5, 350) : 
+            Math.min(window.innerHeight * 0.6, 500);
+        const viewportHeight = Math.min(fullHeight, maxViewportHeight);
+        
+        // Clear and setup container
+        container.html('');
+        container.style('position', 'relative');
+        
+        // Create main wrapper with flexbox for Y-axis label
+        const wrapper = container.append('div')
+            .attr('class', 'chart-wrapper')
+            .style('display', 'flex')
+            .style('align-items', 'stretch');
+        
+        // Y-axis label (outside scroll area)
+        wrapper.append('div')
+            .attr('class', 'y-axis-label-container')
+            .style('writing-mode', 'vertical-rl')
+            .style('transform', 'rotate(180deg)')
+            .style('display', 'flex')
+            .style('align-items', 'center')
+            .style('justify-content', 'center')
+            .style('padding', '0 5px')
+            .style('font-size', isMobile ? '12px' : '14px')
+            .style('font-weight', 'bold')
+            .style('color', '#333')
+            .text('Position');
+        
+        // Main chart area
+        const chartArea = wrapper.append('div')
+            .attr('class', 'chart-area')
+            .style('flex', '1')
+            .style('display', 'flex')
+            .style('flex-direction', 'column');
+        
+        // Add navigation controls
+        this.addNavigationControls(chartArea, totalAthletes);
+        
+        // Create fixed header for X-axis
+        const headerHeight = 35;
+        const headerSvg = chartArea.append('svg')
+            .attr('class', 'chart-header')
+            .attr('width', containerWidth - 30)
+            .attr('height', headerHeight);
+        
+        const headerG = headerSvg.append('g')
+            .attr('transform', `translate(${margin.left}, ${headerHeight - 5})`);
+        
+        // Create scrollable container
+        const scrollContainer = chartArea.append('div')
+            .attr('class', 'scroll-container')
+            .style('height', `${viewportHeight}px`)
+            .style('overflow-y', 'auto')
+            .style('overflow-x', 'hidden')
+            .style('border', '1px solid #ddd')
+            .style('border-radius', '4px')
+            .style('background', '#fafafa');
+        
+        // Create the main SVG inside scrollable container
+        const svg = scrollContainer.append('svg')
+            .attr('width', containerWidth - 30)
+            .attr('height', fullHeight);
+        
+        const g = svg.append('g')
+            .attr('transform', `translate(${margin.left}, 0)`);
         
         // Setup scales
+        const stageProportions = this.calculateStageProportions();
+        
         const xScale = d3.scaleLinear()
             .domain([0, 1])
             .range([0, width]);
@@ -42,62 +120,182 @@ export class RankChart extends BaseChart {
         const totalPositions = this.data.length + dsqAthletes.length;
         const yScale = d3.scaleLinear()
             .domain([1, totalPositions + 1])
-            .range([0, height]);
+            .range([this.rowHeight / 2, fullHeight - this.rowHeight / 2]);
         
-        // Setup axes
-        // X-axis grid
-        g.append("g")
-            .attr("class", "grid grid-x")
-            .attr("transform", `translate(0,${height})`)
-            .call(d3.axisBottom(xScale).tickSize(-height).tickFormat(""));
-
-        // Y-axis grid - every 5 positions
-        g.append("g")
-            .attr("class", "grid grid-y")
-            .call(d3.axisLeft(yScale)
-                .tickValues(d3.range(0, totalPositions + 5, 5))
-                .tickSize(-width)
-                .tickFormat("")
-            );
-
-        // X-axis
-        g.append("g")
-            .attr("class", "x-axis axis")
-            .attr("transform", `translate(0,${height})`)
-            .call(d3.axisBottom(xScale));
-
-        // Y-axis - every 5 positions
-        g.append("g")
-            .attr("class", "y-axis axis")
-            .call(d3.axisLeft(yScale)
-                .tickValues(d3.range(0, totalPositions + 5, 5))
-                .tickFormat(d => d === 0 ? '' : d)
-            );
-
-        // Y-axis label
-        g.append("text")
-            .attr("class", "y-axis-label axis-label")
-            .attr("transform", "rotate(-90)")
-            .attr("y", isMobile ? -35 : -50)
-            .attr("x", -(height / 2))
-            .attr("dy", "1em")
-            .style("text-anchor", "middle")
-            .style("font-size", isMobile ? "12px" : "14px")
-            .text("Position");        
-        // Customize x-axis
-        this.customizeXAxis(g, xScale, stageProportions, height, isMobile);
+        // Draw header (X-axis labels)
+        this.drawXAxisHeader(headerG, xScale, stageProportions, width);
         
-        // Draw transition lines
-        this.drawTransitionLines(g, xScale, stageProportions, height);
+        // Draw background grid
+        this.drawGrid(g, xScale, yScale, width, fullHeight, stageProportions, totalPositions);
         
         // Calculate athlete positions
         this.calculateAthletePositions(nonDsqData, dsqAthletes);
         
+        // Draw Y-axis with all positions
+        this.drawYAxis(g, yScale, totalPositions);
+        
         // Draw athlete lines
         this.drawAthleteLines(g, xScale, yScale, stageProportions, nonDsqData);
         
-        // Draw labels
+        // Draw labels (without position numbers)
         this.drawLabels(g, yScale, width, nonDsqData, dsqAthletes);
+        
+        // Add scroll info and mini-map
+        this.addScrollFeatures(chartArea, scrollContainer, viewportHeight, fullHeight, totalAthletes);
+    }
+    
+    addNavigationControls(container, totalAthletes) {
+        const navControls = container.append('div')
+            .attr('class', 'scroll-nav-controls')
+            .style('margin-bottom', '8px')
+            .style('text-align', 'center');
+        
+        const jumpButtons = [
+            { label: '🥇 Top 10', position: 0 },
+            { label: '📊 Mid Pack', position: Math.floor(totalAthletes / 2) - 5 },
+            { label: '🏁 Back', position: Math.max(0, totalAthletes - 12) }
+        ];
+        
+        jumpButtons.forEach(btn => {
+            navControls.append('button')
+                .style('padding', '6px 10px')
+                .style('margin', '2px')
+                .style('border-radius', '4px')
+                .style('border', '1px solid #ccc')
+                .style('background', 'white')
+                .style('cursor', 'pointer')
+                .style('font-size', '11px')
+                .style('transition', 'background 0.2s')
+                .text(btn.label)
+                .on('click', () => {
+                    const scrollTarget = btn.position * this.rowHeight;
+                    d3.select('.scroll-container').node().scrollTop = scrollTarget;
+                })
+                .on('mouseover', function() {
+                    d3.select(this).style('background', '#e3f2fd');
+                })
+                .on('mouseout', function() {
+                    d3.select(this).style('background', 'white');
+                });
+        });
+    }
+    
+    drawXAxisHeader(g, xScale, proportions, width) {
+        const xLabels = [
+            { pos: proportions.swimEnd / 2, text: 'SWIM' },
+            { pos: (proportions.swimEnd + proportions.t1End) / 2, text: 'T1' },
+            { pos: (proportions.t1End + proportions.bikeEnd) / 2, text: 'BIKE' },
+            { pos: (proportions.bikeEnd + proportions.t2End) / 2, text: 'T2' },
+            { pos: (proportions.t2End + 1) / 2, text: 'RUN' }
+        ];
+        
+        // Background for header
+        g.append('rect')
+            .attr('x', 0)
+            .attr('y', -25)
+            .attr('width', width)
+            .attr('height', 25)
+            .attr('fill', '#f5f5f5')
+            .attr('rx', 3);
+        
+        xLabels.forEach(label => {
+            g.append("text")
+                .attr("x", xScale(label.pos))
+                .attr("y", -8)
+                .style("text-anchor", "middle")
+                .style("font-size", "11px")
+                .style("font-weight", "bold")
+                .style("fill", "#333")
+                .text(label.text);
+        });
+        
+        // Stage separators
+        const positions = [0, proportions.swimEnd, proportions.t1End, proportions.bikeEnd, proportions.t2End, 1];
+        positions.forEach(pos => {
+            g.append("line")
+                .attr("x1", xScale(pos))
+                .attr("x2", xScale(pos))
+                .attr("y1", -25)
+                .attr("y2", 0)
+                .attr("stroke", "#ccc")
+                .attr("stroke-width", 1);
+        });
+    }
+    
+    drawGrid(g, xScale, yScale, width, height, proportions, totalPositions) {
+        // Vertical stage dividers
+        const positions = [proportions.swimEnd, proportions.t1End, proportions.bikeEnd, proportions.t2End];
+        positions.forEach(pos => {
+            g.append("line")
+                .attr("x1", xScale(pos))
+                .attr("x2", xScale(pos))
+                .attr("y1", 0)
+                .attr("y2", height)
+                .attr("stroke", "#e0e0e0")
+                .attr("stroke-width", 1)
+                .attr("stroke-dasharray", "3,3");
+        });
+        
+        // Horizontal lines for every position
+        for (let i = 1; i <= totalPositions; i++) {
+            g.append("line")
+                .attr("x1", 0)
+                .attr("x2", width)
+                .attr("y1", yScale(i))
+                .attr("y2", yScale(i))
+                .attr("stroke", i % 5 === 0 ? "#ddd" : "#f0f0f0")
+                .attr("stroke-width", i % 5 === 0 ? 1 : 0.5);
+        }
+    }
+    
+    drawYAxis(g, yScale, totalPositions) {
+        // Draw position number for EVERY athlete
+        for (let i = 1; i <= totalPositions; i++) {
+            g.append("text")
+                .attr("x", -8)
+                .attr("y", yScale(i))
+                .attr("dy", "0.35em")
+                .style("text-anchor", "end")
+                .style("font-size", "9px")
+                .style("fill", i <= 3 ? "#d4af37" : (i <= 10 ? "#666" : "#999"))
+                .style("font-weight", i <= 3 ? "bold" : "normal")
+                .text(i);
+        }
+    }
+    
+    addScrollFeatures(container, scrollContainer, viewportHeight, fullHeight, totalAthletes) {
+        // Scroll info display
+        const scrollInfo = container.append('div')
+            .attr('class', 'scroll-info')
+            .style('text-align', 'center')
+            .style('font-size', '11px')
+            .style('color', '#666')
+            .style('margin-top', '5px')
+            .style('padding', '4px')
+            .style('background', '#f5f5f5')
+            .style('border-radius', '3px');
+        
+        // Update scroll info on scroll
+        const updateScrollInfo = () => {
+            const scrollTop = scrollContainer.node().scrollTop;
+            const currentPosition = Math.floor(scrollTop / this.rowHeight) + 1;
+            const endPosition = Math.min(
+                currentPosition + Math.floor(viewportHeight / this.rowHeight) - 1, 
+                totalAthletes
+            );
+            scrollInfo.text(`Viewing positions ${currentPosition} - ${endPosition} of ${totalAthletes}`);
+        };
+        
+        scrollContainer.on('scroll', updateScrollInfo);
+        updateScrollInfo(); // Initial update
+        
+        // Add keyboard navigation hint
+        container.append('div')
+            .style('text-align', 'center')
+            .style('font-size', '10px')
+            .style('color', '#999')
+            .style('margin-top', '3px')
+            .text('Scroll or use buttons to navigate • Hover over lines for details');
     }
     
     calculateStageProportions() {
@@ -109,7 +307,6 @@ export class RankChart extends BaseChart {
         const avgT2 = d3.mean(finishers, d => d.actualT2Time || 0);
         const avgRun = d3.mean(finishers, d => d.actualRunTime || 0);
         
-        // Boost transition visibility
         const t1Boost = avgT1 * 4;
         const t2Boost = avgT2 * 4;
         const totalBoost = t1Boost + t2Boost;
@@ -132,66 +329,6 @@ export class RankChart extends BaseChart {
             bikeEnd: (adjustedSwim + adjustedT1 + adjustedBike) / adjustedTotal,
             t2End: (adjustedSwim + adjustedT1 + adjustedBike + adjustedT2) / adjustedTotal
         };
-    }
-    
-    customizeXAxis(g, xScale, proportions, height, isMobile) {
-        const stages = [
-            {name: "Start", position: 0},
-            {name: "Swim", position: proportions.swimEnd},
-            {name: "T1", position: proportions.t1End},
-            {name: "Bike", position: proportions.bikeEnd},
-            {name: "T2", position: proportions.t2End},
-            {name: "Finish", position: 1}
-        ];
-        
-        const xAxis = g.select('.x-axis');
-        xAxis.call(d3.axisBottom(xScale)
-            .tickValues(stages.map(s => s.position))
-            .tickFormat("")
-        );
-        
-        // Add stage labels between markers
-        const xLabels = [
-            { pos: proportions.swimEnd / 2, text: 'Swim' },
-            { pos: (proportions.swimEnd + proportions.t1End) / 2, text: 'T1' },
-            { pos: (proportions.t1End + proportions.bikeEnd) / 2, text: 'Bike' },
-            { pos: (proportions.bikeEnd + proportions.t2End) / 2, text: 'T2' },
-            { pos: (proportions.t2End + 1) / 2, text: 'Run' }
-        ];
-        
-        xLabels.forEach(label => {
-            xAxis.append("text")
-                .attr("x", xScale(label.pos))
-                .attr("y", isMobile ? 25 : 30)
-                .style("text-anchor", "middle")
-                .style("font-size", isMobile ? "10px" : "12px")
-                .style("fill", "black")
-                .text(label.text);
-        });
-    }
-    
-    drawTransitionLines(g, xScale, proportions, height) {
-        const transitionLines = g.append("g")
-            .attr("class", "transition-lines");
-
-        const positions = [
-            proportions.swimEnd,
-            proportions.t1End,
-            proportions.bikeEnd,
-            proportions.t2End
-        ];
-
-        positions.forEach(pos => {
-            transitionLines.append("line")
-                .attr("x1", xScale(pos))
-                .attr("x2", xScale(pos))
-                .attr("y1", 0)
-                .attr("y2", height)
-                .attr("stroke", "#e0e0e0")
-                .attr("stroke-width", 1)
-                .attr("stroke-dasharray", "3,3")
-                .attr("opacity", 0.5);
-        });
     }
     
     calculateAthletePositions(nonDsqData, dsqAthletes) {
@@ -233,10 +370,10 @@ export class RankChart extends BaseChart {
                 .attr("pointer-events", "all");
             
             const strokeDasharray = this.getStrokeDasharray(athlete.status);
+            const baseOpacity = athlete.finalRank && athlete.finalRank <= 10 ? 0.6 : 0.3;
+            const baseWidth = athlete.finalRank && athlete.finalRank <= 3 ? 2.5 : 1.5;
             
-            // Draw line segments
             for (let i = 0; i < lineData.length - 1; i++) {
-                // Invisible hit area
                 athleteGroup.append("line")
                     .attr("class", "athlete-line-hitarea")
                     .attr("x1", xScale(lineData[i].x))
@@ -244,10 +381,9 @@ export class RankChart extends BaseChart {
                     .attr("x2", xScale(lineData[i + 1].x))
                     .attr("y2", yScale(lineData[i + 1].y))
                     .attr("stroke", "transparent")
-                    .attr("stroke-width", 10)
+                    .attr("stroke-width", 12)
                     .attr("pointer-events", "stroke");
                 
-                // Visible line
                 athleteGroup.append("line")
                     .attr("class", "athlete-line")
                     .attr("x1", xScale(lineData[i].x))
@@ -255,74 +391,92 @@ export class RankChart extends BaseChart {
                     .attr("x2", xScale(lineData[i + 1].x))
                     .attr("y2", yScale(lineData[i + 1].y))
                     .attr("stroke", this.colorScale(athlete.name))
-                    .attr("stroke-width", 1.5)
+                    .attr("stroke-width", baseWidth)
                     .attr("stroke-dasharray", strokeDasharray)
-                    .attr("opacity", 0.4)
+                    .attr("opacity", baseOpacity)
                     .attr("pointer-events", "none");
             }
             
-            // Add hover events
-            this.addAthleteHoverEvents(athleteGroup, athlete);
+            this.addAthleteHoverEvents(athleteGroup, athlete, baseWidth, baseOpacity);
         });
     }
     
-    addAthleteHoverEvents(group, athlete) {
+    addAthleteHoverEvents(group, athlete, baseWidth, baseOpacity) {
         group.on("mouseover", (event) => {
+            // Highlight this athlete
             group.selectAll(".athlete-line")
-                .style("stroke-width", "3px")
+                .style("stroke-width", "4px")
                 .style("opacity", "1");
+            
+            // Dim other athletes
+            d3.selectAll('[class^="athlete-group-"]').each(function() {
+                if (this !== group.node()) {
+                    d3.select(this).selectAll(".athlete-line")
+                        .style("opacity", "0.1");
+                }
+            });
             
             const content = tooltipManager.athleteSummary(athlete);
             tooltipManager.show(content, window.innerWidth - 250, event.pageY);
         })
         .on("mouseout", () => {
+            // Restore this athlete
             group.selectAll(".athlete-line")
-                .style("stroke-width", "1.5px")
-                .style("opacity", "0.4");
+                .style("stroke-width", `${baseWidth}px`)
+                .style("opacity", baseOpacity);
+            
+            // Restore other athletes
+            d3.selectAll('[class^="athlete-group-"]').each(function() {
+                const grp = d3.select(this);
+                const athleteData = grp.datum && grp.datum();
+                grp.selectAll(".athlete-line")
+                    .style("opacity", null); // Reset to CSS/inline default
+            });
+            
+            // Re-apply base opacities
+            this.data.forEach((ath, idx) => {
+                const op = ath.finalRank && ath.finalRank <= 10 ? 0.6 : 0.3;
+                const w = ath.finalRank && ath.finalRank <= 3 ? 2.5 : 1.5;
+                d3.select(`.athlete-group-${idx}`).selectAll(".athlete-line")
+                    .style("opacity", op)
+                    .style("stroke-width", `${w}px`);
+            });
             
             tooltipManager.hide();
         });
     }
     
     drawLabels(g, yScale, width, nonDsqData, dsqAthletes) {
-        let nonFinisherPosition = Math.max(...nonDsqData.filter(a => a.finalRank).map(a => a.finalRank || 0)) + 1;
         const isMobile = responsiveManager.isMobile;
         const fontSize = isMobile ? "9px" : "10px";
         
         nonDsqData.forEach((athlete) => {
-            let displayY;
-            if (athlete.finalRank) {
-                displayY = yScale(athlete.finalRank);
-            } else {
-                displayY = yScale(nonFinisherPosition++);
-            }
-            
+            const displayY = yScale(this.athletePositions[athlete.name]);
             const baseName = athlete.baseName || athlete.name.replace(/ \([^)]*\)$/, '');
-            let displayText = '';
             
-            if (athlete.finalRank) {
-                displayText = `${athlete.finalRank}. ${baseName} ${getFlag(athlete.country)}`;
-            } else if (athlete.status) {
-                displayText = `${baseName} ${getFlag(athlete.country)} (${athlete.status})`;
+            // Just name and flag, no position number (it's on the Y-axis now)
+            let displayText = `${baseName} ${getFlag(athlete.country)}`;
+            if (!athlete.finalRank && athlete.status) {
+                displayText += ` (${athlete.status})`;
             }
             
             g.append("text")
-                .attr("x", width + 10)
+                .attr("x", width + 8)
                 .attr("y", displayY)
                 .attr("dy", "0.35em")
                 .style("font-size", fontSize)
                 .style("fill", this.colorScale(athlete.name))
+                .style("font-weight", athlete.finalRank && athlete.finalRank <= 3 ? "bold" : "normal")
                 .text(displayText);
         });
         
-        // DSQ athletes at the end
-        dsqAthletes.forEach((athlete, index) => {
+        dsqAthletes.forEach((athlete) => {
             const baseName = athlete.baseName || athlete.name.replace(/ \([^)]*\)$/, '');
             const displayText = `${baseName} ${getFlag(athlete.country)} (DSQ)`;
-            const displayY = yScale(nonFinisherPosition + index);
+            const displayY = yScale(this.athletePositions[athlete.name]);
             
             g.append("text")
-                .attr("x", width + 10)
+                .attr("x", width + 8)
                 .attr("y", displayY)
                 .attr("dy", "0.35em")
                 .style("font-size", fontSize)

@@ -113,7 +113,7 @@ export class DataProcessor {
         const finishers = processed.filter(a => !['DNF', 'DSQ', 'LAP', 'DNS'].includes(a.status));
         
         processed.forEach((athlete) => {
-            // Race position ranks (cumulative)
+            // Race position ranks (cumulative) - FIXED: Check that comparison athletes have actual times
             if (athlete.actualSwimTime) {
                 const fasterSwimmers = processed.filter(a => 
                     a.actualSwimTime && a.swimCumulative < athlete.swimCumulative
@@ -123,19 +123,19 @@ export class DataProcessor {
             
             if (athlete.actualT1Time) {
                 athlete.t1Rank = processed.filter(a => 
-                    a.t1Cumulative < athlete.t1Cumulative
+                    a.actualT1Time && a.t1Cumulative < athlete.t1Cumulative  // FIXED: Added actualT1Time check
                 ).length + 1;
             }
             
             if (athlete.actualBikeTime) {
                 athlete.bikeRank = processed.filter(a => 
-                    a.bikeCumulative < athlete.bikeCumulative
+                    a.actualBikeTime && a.bikeCumulative < athlete.bikeCumulative  // FIXED: Added actualBikeTime check
                 ).length + 1;
             }
             
             if (athlete.actualT2Time) {
                 athlete.t2Rank = processed.filter(a => 
-                    a.t2Cumulative < athlete.t2Cumulative
+                    a.actualT2Time && a.t2Cumulative < athlete.t2Cumulative  // FIXED: Added actualT2Time check
                 ).length + 1;
             }
             
@@ -170,8 +170,7 @@ export class DataProcessor {
                 ).length + 1;
             }
         });
-    }
-    
+    }    
     calculateGaps(processed) {
         const swimLeader = Math.min(...processed.map(a => a.swimCumulative));
         const t1Leader = Math.min(...processed.map(a => a.t1Cumulative));
