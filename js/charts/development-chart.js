@@ -148,7 +148,7 @@ export class DevelopmentChart extends BaseChart {
         // Create fixed header for X-axis
         const headerHeight = 40;
         const headerSvg = chartArea.append('svg')
-            .attr('class', 'chart-header')
+            .attr('class', 'chart')
             .attr('width', containerWidth - 30)
             .attr('height', headerHeight);
         
@@ -465,16 +465,16 @@ export class DevelopmentChart extends BaseChart {
         
         // Stage separators in header
         const positions = [0, this.stageDist.swim, this.stageDist.t1, this.stageDist.bike, this.stageDist.t2, 100];
-        positions.forEach(pos => {
-            g.append("line")
-                .attr("class", `header-divider-${pos}`)
-                .attr("x1", xScale(pos))
-                .attr("x2", xScale(pos))
-                .attr("y1", -30)
-                .attr("y2", 0)
-                .attr("stroke", "#ccc")
-                .attr("stroke-width", 1);
-        });
+        // positions.forEach(pos => {
+        //     g.append("line")
+        //         .attr("class", `header-divider-${pos}`)
+        //         .attr("x1", xScale(pos))
+        //         .attr("x2", xScale(pos))
+        //         .attr("y1", -30)
+        //         .attr("y2", 0)
+        //         .attr("stroke", "#ccc")
+        //         .attr("stroke-width", 1);
+        // });
     }
     
     drawYAxisScrollable(g, height, isMobile) {
@@ -990,13 +990,13 @@ export class DevelopmentChart extends BaseChart {
         
         // Update header dividers
         const dividerPositions = [0, this.stageDist.swim, this.stageDist.t1, this.stageDist.bike, this.stageDist.t2, 100];
-        dividerPositions.forEach(pos => {
-            container.select(`.header-divider-${pos}`)
-                .transition()
-                .duration(750)
-                .attr("x1", this.xScale(pos))
-                .attr("x2", this.xScale(pos));
-        });
+        // dividerPositions.forEach(pos => {
+        //     container.select(`.header-divider-${pos}`)
+        //         .transition()
+        //         .duration(750)
+        //         .attr("x1", this.xScale(pos))
+        //         .attr("x2", this.xScale(pos));
+        // });
         
         // Update header background
         container.select('.header-bg')
