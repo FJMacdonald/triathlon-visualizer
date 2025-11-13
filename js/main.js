@@ -125,9 +125,57 @@ class TriathlonVisualizer {
     
     setupTabNavigation() {
         const tabButtons = document.querySelectorAll('.tab-btn');
+        const tabNav = document.querySelector('.tab-navigation');
+        
+        // Track scrolling state to prevent accidental clicks
+        let isScrolling = false;
+        let scrollTimeout = null;
+        let touchStartY = 0;
+        let touchStartX = 0;
+        
+        // Detect scroll start
+        if (tabNav) {
+            tabNav.addEventListener('touchstart', (e) => {
+                touchStartY = e.touches[0].clientY;
+                touchStartX = e.touches[0].clientX;
+            }, { passive: true });
+            
+            tabNav.addEventListener('touchmove', (e) => {
+                const deltaY = Math.abs(e.touches[0].clientY - touchStartY);
+                const deltaX = Math.abs(e.touches[0].clientX - touchStartX);
+                
+                // If moved more than threshold, consider it scrolling
+                if (deltaY > 10 || deltaX > 10) {
+                    isScrolling = true;
+                }
+            }, { passive: true });
+            
+            tabNav.addEventListener('touchend', () => {
+                // Reset after a short delay
+                scrollTimeout = setTimeout(() => {
+                    isScrolling = false;
+                }, 100);
+            }, { passive: true });
+        }
+        
+        // Also track page scroll
+        window.addEventListener('scroll', () => {
+            isScrolling = true;
+            if (scrollTimeout) clearTimeout(scrollTimeout);
+            scrollTimeout = setTimeout(() => {
+                isScrolling = false;
+            }, 150);
+        }, { passive: true });
         
         tabButtons.forEach(btn => {
-            btn.addEventListener('click', () => {
+            btn.addEventListener('click', (e) => {
+                // Prevent click if user was scrolling
+                if (isScrolling) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    return;
+                }
+                
                 const tab = btn.dataset.tab;
                 if (!tab) return;
                 
@@ -143,6 +191,13 @@ class TriathlonVisualizer {
                 
                 // Handle sidebar and chart drawing
                 this.handleTabChange(tab);
+            });
+            
+            // Prevent ghost clicks on mobile
+            btn.addEventListener('touchend', (e) => {
+                if (isScrolling) {
+                    e.preventDefault();
+                }
             });
         });
     }

@@ -884,8 +884,122 @@ input[type="file"] {
     .country-list {
         grid-template-columns: repeat(2, 1fr);
     }
+    .tooltip {
+        position: fixed !important;
+        z-index: 10000;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        border: 1px solid rgba(255,255,255,0.2);
+    }
+    
+    /* Prevent accidental tab clicks while scrolling */
+    .tab-navigation {
+        -webkit-overflow-scrolling: touch;
+        scroll-behavior: smooth;
+        padding: var(--spacing-md) 0;
+        margin: var(--spacing-md) 0;
+        /* Add scroll padding to prevent edge clicks */
+        scroll-padding: 0 var(--spacing-lg);
+    }
+    
+    .tab-btn {
+        /* Increase touch target size */
+        min-height: 44px;
+        padding: var(--spacing-sm) var(--spacing-md);
+        /* Add some breathing room */
+        margin: var(--spacing-xs);
+        /* Prevent text selection while scrolling */
+        -webkit-user-select: none;
+        user-select: none;
+        /* Visual feedback for touch */
+        -webkit-tap-highlight-color: rgba(102, 126, 234, 0.3);
+    }
+    
+    /* Fix Y-axis positioning in portrait */
+    .chart-container {
+        width: 100% !important;
+        overflow-x: auto;
+        overflow-y: hidden;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    .chart-container svg {
+        display: block;
+        min-width: 100%;
+    }
+    
+    /* Ensure chart wrapper takes full width */
+    .chart-wrapper {
+        width: 100% !important;
+        min-width: 0;
+    }
+    
+    .chart-area {
+        width: 100% !important;
+        min-width: 0;
+    }
+    
+    /* Fix scroll container width */
+    .scroll-container {
+        width: 100% !important;
+    }
+    
+    /* Y-axis label container fixed width */
+    .y-axis-label-container {
+        flex-shrink: 0 !important;
+        width: 20px !important;
+        min-width: 20px !important;
+    }
+}
+/* Portrait-specific fixes */
+@media (max-width: 768px) and (orientation: portrait) {
+    .container {
+        padding: var(--spacing-md);
+    }
+    
+    /* Reduce margins in portrait to maximize chart space */
+    .chart-container {
+        padding: var(--spacing-sm);
+        margin: var(--spacing-sm) 0;
+    }
+    
+    /* Ensure SVG doesn't overflow */
+    #developmentChart,
+    #rankChart,
+    #spiderChart {
+        width: 100%;
+        overflow: visible;
+    }
+    
+    /* Fix tab navigation for portrait scrolling */
+    .tab-navigation {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: var(--spacing-xs);
+        overflow: visible;
+    }
+    
+    .tab-btn {
+        width: 100%;
+        font-size: var(--font-size-xs);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
 }
 
+/* Landscape mobile */
+@media (max-width: 768px) and (orientation: landscape) {
+    .tab-navigation {
+        display: flex;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        justify-content: flex-start;
+    }
+    
+    .tab-btn {
+        flex-shrink: 0;
+    }
+}
 @media (max-width: 480px) {
     .tab-navigation {
         flex-direction: column;

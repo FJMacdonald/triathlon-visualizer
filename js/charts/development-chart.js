@@ -92,12 +92,23 @@ export class DevelopmentChart extends BaseChart {
     
     drawScrollableChart(racers) {
         const container = d3.select(this.container);
-        const containerWidth = container.node().getBoundingClientRect().width;
+        const containerRect = container.node().getBoundingClientRect();
+        const containerWidth = containerRect.width;
         const isMobile = responsiveManager.isMobile;
         
-        // Calculate dimensions - extra right margin for finish circles
-        const margin = { top: 10, right: 30, bottom: 20, left: 55 };
-        const width = containerWidth - margin.left - margin.right - 30;
+        // Calculate dimensions - ensure we account for all padding/margins
+        const margin = { 
+            top: 10, 
+            right: isMobile ? 15 : 30, 
+            bottom: 20, 
+            left: isMobile ? 45 : 55 
+        };
+        
+        // Calculate actual available width
+        const yAxisLabelWidth = isMobile ? 20 : 25;
+        const scrollbarWidth = 15; // Account for scrollbar
+        const availableWidth = containerWidth - yAxisLabelWidth - scrollbarWidth;
+        const width = Math.max(200, availableWidth - margin.left - margin.right);
         
         // Calculate max time behind for height calculation
         const maxTimeBehind = d3.max(this.chartData, d => d3.max(d.values, v => v.timeBehind)) || 100;
@@ -119,7 +130,8 @@ export class DevelopmentChart extends BaseChart {
         const wrapper = container.append('div')
             .attr('class', 'chart-wrapper')
             .style('display', 'flex')
-            .style('align-items', 'stretch');
+            .style('align-items', 'stretch')
+            .style('width', '100%');
         
         // Y-axis label (outside scroll area)
         wrapper.append('div')
@@ -129,10 +141,12 @@ export class DevelopmentChart extends BaseChart {
             .style('display', 'flex')
             .style('align-items', 'center')
             .style('justify-content', 'center')
-            .style('padding', '0 5px')
-            .style('font-size', isMobile ? '12px' : '14px')
+            .style('padding', '0 2px')
+            .style('font-size', isMobile ? '10px' : '14px')
             .style('font-weight', 'bold')
             .style('color', '#333')
+            .style('flex-shrink', '0')
+            .style('width', `${yAxisLabelWidth}px`)
             .text('Time Behind Leader (seconds)');
         
         // Main chart area
@@ -140,17 +154,21 @@ export class DevelopmentChart extends BaseChart {
             .attr('class', 'chart-area')
             .style('flex', '1')
             .style('display', 'flex')
-            .style('flex-direction', 'column');
+            .style('flex-direction', 'column')
+            .style('min-width', '0'); // Important for flex shrinking
         
         // Height control slider
         this.addHeightControl(chartArea);
         
         // Create fixed header for X-axis
         const headerHeight = 40;
+        const totalSvgWidth = width + margin.left + margin.right;
+        
         const headerSvg = chartArea.append('svg')
-            .attr('class', 'chart')
-            .attr('width', containerWidth - 30)
-            .attr('height', headerHeight);
+            .attr('class', 'chart-header')
+            .attr('width', totalSvgWidth)
+            .attr('height', headerHeight)
+            .style('display', 'block');
         
         const headerG = headerSvg.append('g')
             .attr('transform', `translate(${margin.left}, ${headerHeight - 5})`);
@@ -163,21 +181,23 @@ export class DevelopmentChart extends BaseChart {
             .style('overflow-x', 'hidden')
             .style('border', '1px solid #ddd')
             .style('border-radius', '4px')
-            .style('background', '#fafafa');
+            .style('background', '#fafafa')
+            .style('width', '100%');
         
         // Create the main SVG inside scrollable container
         const svg = scrollContainer.append('svg')
-            .attr('width', containerWidth - 30)
-            .attr('height', fullHeight + margin.bottom + 20); // Extra space for circles
+            .attr('width', totalSvgWidth)
+            .attr('height', fullHeight + margin.bottom + 20)
+            .style('display', 'block');
         
-        // Add clipping path - include extra space for finish circles
+        // Add clipping path
         svg.append("defs")
             .append("clipPath")
             .attr("id", "chart-clip")
             .append("rect")
             .attr("x", -5)
             .attr("y", -5)
-            .attr("width", width + 15) // Extra width for finish circles
+            .attr("width", width + 15)
             .attr("height", fullHeight + margin.bottom + 10);
         
         const g = svg.append('g')
@@ -208,16 +228,10 @@ export class DevelopmentChart extends BaseChart {
         this.dimensions = { width, height: fullHeight, margin };
         this.scrollContainer = scrollContainer;
         
-        // Draw header (X-axis labels)
+        // Draw chart elements
         this.drawXAxisHeader(headerG, this.xScale, width);
-        
-        // Draw Y-axis
         this.drawYAxisScrollable(g, fullHeight, isMobile);
-        
-        // Draw grid
         this.drawGridScrollable(g, width, fullHeight);
-        
-        // Draw transition lines
         this.drawTransitionLines(g, fullHeight);
         
         // Create content group with clipping
@@ -227,8 +241,6 @@ export class DevelopmentChart extends BaseChart {
         
         // Draw athlete paths
         this.drawAthletePaths(chartContent);
-        
-        // Draw team highlights
         this.drawTeamHighlights();
         
         // Add scroll info
@@ -244,8 +256,7 @@ export class DevelopmentChart extends BaseChart {
             .text('Scroll to see athletes further behind • Use slider above to adjust spread');
         
         this.restoreState();
-    }
-    
+    }    
     addHeightControl(container) {
         const controlDiv = container.append('div')
             .attr('class', 'height-control')
@@ -317,7 +328,9 @@ export class DevelopmentChart extends BaseChart {
             .attr("x", -5)
             .attr("y", -5)
             .attr("width", width + 15)
-            .attr("height", height + 10);
+            .attr("height", height + 10)
+            .attr("viewBox", `0 0 ${width + margin.left + margin.right} ${height + margin.top + margin.bottom}`)
+            .attr("preserveAspectRatio", "xMinYMid meet");
         
         // Setup scales
         const maxTimeBehind = d3.max(this.chartData, d => d3.max(d.values, v => v.timeBehind)) || 100;
@@ -465,16 +478,7 @@ export class DevelopmentChart extends BaseChart {
         
         // Stage separators in header
         const positions = [0, this.stageDist.swim, this.stageDist.t1, this.stageDist.bike, this.stageDist.t2, 100];
-        // positions.forEach(pos => {
-        //     g.append("line")
-        //         .attr("class", `header-divider-${pos}`)
-        //         .attr("x1", xScale(pos))
-        //         .attr("x2", xScale(pos))
-        //         .attr("y1", -30)
-        //         .attr("y2", 0)
-        //         .attr("stroke", "#ccc")
-        //         .attr("stroke-width", 1);
-        // });
+
     }
     
     drawYAxisScrollable(g, height, isMobile) {
@@ -990,13 +994,6 @@ export class DevelopmentChart extends BaseChart {
         
         // Update header dividers
         const dividerPositions = [0, this.stageDist.swim, this.stageDist.t1, this.stageDist.bike, this.stageDist.t2, 100];
-        // dividerPositions.forEach(pos => {
-        //     container.select(`.header-divider-${pos}`)
-        //         .transition()
-        //         .duration(750)
-        //         .attr("x1", this.xScale(pos))
-        //         .attr("x2", this.xScale(pos));
-        // });
         
         // Update header background
         container.select('.header-bg')
@@ -1073,199 +1070,11 @@ export class DevelopmentChart extends BaseChart {
         }
     }
 
-    enableZoomMode() {
-        // this.currentSection = 'zoom';
-        // this.zoomMode = true;
-        
-        // const zoomHint = document.getElementById('zoomHint');
-        // if (zoomHint) {
-        //     zoomHint.classList.add('active');
-        //     zoomHint.innerHTML = 'Hold <strong>Shift</strong> and drag to select area to zoom';
-        //     zoomHint.style.background = 'rgba(102, 126, 234, 0.95)';
-        // }
-        
-        // if (!this.svg || !this.dimensions) return;
-        
-        // const margin = this.dimensions.margin;
-        // let isDragging = false;
-        // let overlayActive = false;
-        // let zoomRect = null;
-        // let zoomStartX = null;
-        // let zoomStartY = null;
-        
-        // // Remove any existing overlay
-        // this.svg.select(".zoom-overlay").remove();
-        // this.svg.select(".zoom-selection").remove();
-        
-        // const zoomOverlay = this.svg.append("rect")
-        //     .attr("class", "zoom-overlay")
-        //     .attr("x", margin.left)
-        //     .attr("y", margin.top)
-        //     .attr("width", this.dimensions.width)
-        //     .attr("height", this.dimensions.height)
-        //     .style("fill", "none")
-        //     .style("pointer-events", "none")
-        //     .style("cursor", "crosshair");
-        
-        // const svgNode = this.svg.node();
-        // const self = this;
-        
-        // // Store handlers so we can remove them later
-        // this.zoomKeydownHandler = function(event) {
-        //     if (event.key === 'Shift' && self.zoomMode && !isDragging) {
-        //         zoomOverlay.style("pointer-events", "all").classed("active", true);
-        //         overlayActive = true;
-        //         if (zoomHint) {
-        //             zoomHint.innerHTML = '✓ Shift held - Drag to select zoom area';
-        //             zoomHint.style.background = 'rgba(40, 167, 69, 0.95)';
-        //         }
-        //     }
-        // };
-        
-        // this.zoomKeyupHandler = function(event) {
-        //     if (event.key === 'Shift' && !isDragging) {
-        //         zoomOverlay.style("pointer-events", "none").classed("active", false);
-        //         overlayActive = false;
-        //         if (zoomHint) {
-        //             zoomHint.innerHTML = 'Hold <strong>Shift</strong> and drag to select area to zoom';
-        //             zoomHint.style.background = 'rgba(102, 126, 234, 0.95)';
-        //         }
-        //     }
-        // };
-        
-        // this.zoomMousemoveHandler = function(event) {
-        //     if (!self.zoomMode || !isDragging || !zoomRect) return;
-            
-        //     const rect = svgNode.getBoundingClientRect();
-        //     const x = event.clientX - rect.left;
-        //     const y = event.clientY - rect.top;
-            
-        //     const currentX = Math.min(Math.max(margin.left, x), margin.left + self.dimensions.width);
-        //     const currentY = Math.min(Math.max(margin.top, y), margin.top + self.dimensions.height);
-            
-        //     const startX = zoomStartX + margin.left;
-        //     const startY = zoomStartY + margin.top;
-            
-        //     const width = Math.abs(currentX - startX);
-        //     const height = Math.abs(currentY - startY);
-            
-        //     zoomRect
-        //         .attr("x", Math.min(currentX, startX))
-        //         .attr("y", Math.min(currentY, startY))
-        //         .attr("width", width)
-        //         .attr("height", height);
-        // };
-        
-        // this.zoomMouseupHandler = function(event) {
-        //     if (!self.zoomMode || !isDragging || !zoomRect) return;
-            
-        //     isDragging = false;
-            
-        //     const rect = svgNode.getBoundingClientRect();
-        //     const x = event.clientX - rect.left;
-        //     const y = event.clientY - rect.top;
-            
-        //     const endX = Math.min(Math.max(margin.left, x), margin.left + self.dimensions.width) - margin.left;
-        //     const endY = Math.min(Math.max(margin.top, y), margin.top + self.dimensions.height) - margin.top;
-            
-        //     // Check if drag was significant (at least 20px in both directions)
-        //     if (Math.abs(endX - zoomStartX) > 20 && Math.abs(endY - zoomStartY) > 20) {
-        //         const x1 = Math.min(zoomStartX, endX);
-        //         const x2 = Math.max(zoomStartX, endX);
-        //         const y1 = Math.min(zoomStartY, endY);
-        //         const y2 = Math.max(zoomStartY, endY);
-                
-        //         // Convert pixel coordinates to data coordinates
-        //         const xDomain = [
-        //             self.xScale.invert(x1),
-        //             self.xScale.invert(x2)
-        //         ];
-        //         const yDomain = [
-        //             self.yScale.invert(y2),  // Inverted because y-axis is flipped
-        //             self.yScale.invert(y1)
-        //         ];
-                
-        //         // Apply new domains
-        //         self.xScale.domain(xDomain);
-        //         self.yScale.domain(yDomain);
-                
-        //         // Update the chart
-        //         self.update();
-                
-        //         if (zoomHint) {
-        //             zoomHint.innerHTML = 'Zoomed! Hold <strong>Shift</strong> to zoom again or click Reset';
-        //         }
-        //     }
-            
-        //     // Clean up
-        //     self.svg.select(".zoom-selection").remove();
-        //     if (!event.shiftKey) {
-        //         zoomOverlay.style("pointer-events", "none").classed("active", false);
-        //         overlayActive = false;
-        //         if (zoomHint) {
-        //             zoomHint.innerHTML = 'Hold <strong>Shift</strong> and drag to select area to zoom';
-        //             zoomHint.style.background = 'rgba(102, 126, 234, 0.95)';
-        //         }
-        //     }
-        //     zoomRect = null;
-        //     zoomStartX = null;
-        //     zoomStartY = null;
-        // };
-        
-        // // Attach event listeners
-        // d3.select(window).on("keydown.zoom", this.zoomKeydownHandler);
-        // d3.select(window).on("keyup.zoom", this.zoomKeyupHandler);
-        // d3.select(window).on("mousemove.zoom", this.zoomMousemoveHandler);
-        // d3.select(window).on("mouseup.zoom", this.zoomMouseupHandler);
-        
-        // zoomOverlay.on("mousedown", function(event) {
-        //     if (!self.zoomMode || !overlayActive) return;
-            
-        //     isDragging = true;
-        //     const [x, y] = d3.pointer(event, this);
-        //     zoomStartX = x - margin.left;
-        //     zoomStartY = y - margin.top;
-            
-        //     self.svg.select(".zoom-selection").remove();
-            
-        //     zoomRect = self.svg.append("rect")
-        //         .attr("class", "zoom-selection")
-        //         .attr("x", x)
-        //         .attr("y", y)
-        //         .attr("width", 0)
-        //         .attr("height", 0);
-            
-        //     event.preventDefault();
-        // });
-    }
 
-    // Update disableZoomMode to clean up properly:
 
-    disableZoomMode() {
-        // this.zoomMode = false;
-        
-        // const zoomHint = document.getElementById('zoomHint');
-        // if (zoomHint) {
-        //     zoomHint.classList.remove('active');
-        // }
-        
-        // if (this.svg) {
-        //     this.svg.select(".zoom-overlay").remove();
-        //     this.svg.select(".zoom-selection").remove();
-        // }
-        
-        // // Remove all event listeners
-        // d3.select(window).on("mousemove.zoom", null);
-        // d3.select(window).on("mouseup.zoom", null);
-        // d3.select(window).on("keydown.zoom", null);
-        // d3.select(window).on("keyup.zoom", null);
-        
-        // // Clear handler references
-        // this.zoomKeydownHandler = null;
-        // this.zoomKeyupHandler = null;
-        // this.zoomMousemoveHandler = null;
-        // this.zoomMouseupHandler = null;
-    }
+
+
+
 
 
     showSection(section) {
@@ -1274,9 +1083,8 @@ export class DevelopmentChart extends BaseChart {
                 alert('Zoom mode is not available in scrollable view.');
                 return;
             }
-            this.enableZoomMode();
         } else {
-            this.disableZoomMode();
+
             this.currentSection = section;
             this.update();
         }

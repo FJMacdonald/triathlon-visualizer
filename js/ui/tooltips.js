@@ -4,6 +4,7 @@ import { RaceConfig } from '../config/race-config.js';
 export class TooltipManager {
     constructor() {
         this.tooltip = null;
+        this.hideTimeout = null;
         this.init();
     }
     
@@ -15,6 +16,29 @@ export class TooltipManager {
                 .attr('class', 'tooltip')
                 .attr('id', 'tooltip');
         }
+        
+        // Add global touch handler to dismiss tooltip
+        this.setupGlobalDismiss();
+    }
+    
+    setupGlobalDismiss() {
+        // Dismiss tooltip on any touch outside
+        document.addEventListener('touchstart', (e) => {
+            // Don't dismiss if touching the tooltip itself
+            if (!e.target.closest('.tooltip')) {
+                this.hide(0);
+            }
+        }, { passive: true });
+        
+        // Also dismiss on scroll
+        document.addEventListener('scroll', () => {
+            this.hide(0);
+        }, { passive: true });
+        
+        // Dismiss on orientation change
+        window.addEventListener('orientationchange', () => {
+            this.hide(0);
+        });
     }
     
     show(content, x, y, options = {}) {
@@ -25,30 +49,76 @@ export class TooltipManager {
             preferLeft = false 
         } = options;
         
-        let posX = x + offsetX;
-        let posY = y + offsetY;
+        // Clear any pending hide
+        if (this.hideTimeout) {
+            clearTimeout(this.hideTimeout);
+            this.hideTimeout = null;
+        }
         
-        // Check if tooltip would go off screen
-        if (preferLeft || (posX + maxWidth > window.innerWidth)) {
-            posX = x - maxWidth - offsetX;
+        // Get viewport dimensions
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+        const isMobile = viewportWidth <= 768;
+        
+        // On mobile, position tooltip more carefully
+        let posX, posY;
+        
+        if (isMobile) {
+            // On mobile, show tooltip at top of screen or bottom, centered
+            const tooltipWidth = Math.min(maxWidth, viewportWidth - 20);
+            posX = (viewportWidth - tooltipWidth) / 2;
+            
+            // Position at top if touch is in bottom half, otherwise at bottom
+            if (y > viewportHeight / 2) {
+                posY = 60; // Below any fixed header
+            } else {
+                posY = viewportHeight - 150; // Above bottom
+            }
+            
+            this.tooltip.style('max-width', `${tooltipWidth}px`);
+        } else {
+            posX = x + offsetX;
+            posY = y + offsetY;
+            
+            // Check if tooltip would go off screen
+            if (preferLeft || (posX + maxWidth > viewportWidth)) {
+                posX = x - maxWidth - offsetX;
+            }
+            
+            // Ensure tooltip stays in viewport
+            if (posX < 10) posX = 10;
+            if (posY < 10) posY = 10;
+            
+            this.tooltip.style('max-width', `${maxWidth}px`);
         }
         
         this.tooltip
             .html(content)
             .style('left', `${posX}px`)
             .style('top', `${posY}px`)
-            .style('max-width', `${maxWidth}px`)
+            .style('position', 'fixed') // Use fixed positioning
             .transition()
             .duration(200)
             .style('opacity', 0.9);
+        
+        // Auto-hide on mobile after delay
+        if (isMobile) {
+            this.hideTimeout = setTimeout(() => this.hide(300), 4000);
+        }
     }
     
     hide(delay = 500) {
+        if (this.hideTimeout) {
+            clearTimeout(this.hideTimeout);
+            this.hideTimeout = null;
+        }
+        
         this.tooltip
             .transition()
             .duration(delay)
             .style('opacity', 0);
     }
+ 
     
     // Generate tooltip content for athlete summary
     athleteSummary(athlete) {
@@ -88,7 +158,6 @@ export class TooltipManager {
         return content;
     }
     
-    // Generate tooltip for stage point
     stagePoint(athlete, stage, cumTime, timeBehindLeader) {
         const name = athlete.baseName || athlete.name.replace(/ \([^)]*\)$/, '');
         let content = `<strong>${name} (${athlete.country})</strong><br/>`;
@@ -150,12 +219,14 @@ export class TooltipManager {
                 break;
         }
         
-        content += `<br/><br/><em style="font-size: 10px;">Long press for hypothetical analysis</em>`;
+        const isMobile = window.innerWidth <= 768;
+        if (!isMobile) {
+            content += `<br/><br/><em style="font-size: 10px;">Long press for hypothetical analysis</em>`;
+        }
         
         return content;
     }
     
-    // Spider chart tooltip
     spiderAthlete(athlete) {
         const name = athlete.baseName || athlete.name.replace(/ \([^)]*\)$/, '');
         let content = `<strong>${name} ${athlete.country}</strong><br/>`;
