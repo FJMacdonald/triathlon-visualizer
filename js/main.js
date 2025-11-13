@@ -24,7 +24,6 @@ class TriathlonVisualizer {
     init() {
         this.setupFileUpload();
         this.setupTabNavigation();
-        this.setupRaceConfigDialog();
         this.setupSidebarToggle();
     }
     
@@ -223,11 +222,9 @@ class TriathlonVisualizer {
             case 'development':
                 sidebarManager.show();
                 if (this.developmentChart) {
-                    // CRITICAL: Set visibility BEFORE drawing
                     this.developmentChart.athleteVisibility = {...this.athleteVisibility};
                     this.developmentChart.countryVisibility = {...this.countryVisibility};
                     this.developmentChart.draw();
-                    // Restore state is now called at end of draw()
                 }
                 this.populateDevelopmentSidebar();
                 break;
@@ -248,10 +245,147 @@ class TriathlonVisualizer {
                 
             case 'settings':
                 sidebarManager.hide();
-                this.openRaceConfigDialog();
+                this.displaySettingsPage(); 
                 break;
         }
     }
+
+    displaySettingsPage() {
+        const settingsSection = document.getElementById('settingsSection');
+        if (!settingsSection) return;
+        
+        const html = `
+            <div class="chart-container active" style="max-width: 800px; margin: 0 auto;">
+                <div class="chart-title">⚙️ Race Configuration</div>
+                <div style="padding: 20px;">
+                    <div class="control-group" style="margin-bottom: 24px;">
+                        <label style="display: block; font-weight: 600; margin-bottom: 8px; font-size: 14px;">Race Type:</label>
+                        <select id="raceTypeSelect" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px;">
+                            <option value="standard">Standard Distance (1.5km / 40km / 10km)</option>
+                            <option value="sprint">Sprint Distance (750m / 20km / 5km)</option>
+                            <option value="olympic">Olympic Distance (1.5km / 40km / 10km)</option>
+                            <option value="custom">Custom</option>
+                        </select>
+                    </div>
+                    
+                    <div class="control-group" style="margin-bottom: 20px;">
+                        <label style="display: block; font-weight: 600; margin-bottom: 8px; font-size: 14px;">
+                            Swim Distance (meters):
+                            <span id="swimDistanceValue" style="float: right; color: #667eea; font-weight: 700;">${RaceConfig.distances.swim}m</span>
+                        </label>
+                        <input type="range" id="swimDistance" value="${RaceConfig.distances.swim}" min="100" max="3800" step="50" 
+                            style="width: 100%; cursor: pointer;">
+                        <div style="display: flex; justify-content: space-between; font-size: 11px; color: #999; margin-top: 4px;">
+                            <span>100m</span>
+                            <span>3800m</span>
+                        </div>
+                    </div>
+                    
+                    <div class="control-group" style="margin-bottom: 20px;">
+                        <label style="display: block; font-weight: 600; margin-bottom: 8px; font-size: 14px;">
+                            Bike Distance (km):
+                            <span id="bikeDistanceValue" style="float: right; color: #667eea; font-weight: 700;">${RaceConfig.distances.bike}km</span>
+                        </label>
+                        <input type="range" id="bikeDistance" value="${RaceConfig.distances.bike}" min="5" max="180" step="1" 
+                            style="width: 100%; cursor: pointer;">
+                        <div style="display: flex; justify-content: space-between; font-size: 11px; color: #999; margin-top: 4px;">
+                            <span>5km</span>
+                            <span>180km</span>
+                        </div>
+                    </div>
+                    
+                    <div class="control-group" style="margin-bottom: 24px;">
+                        <label style="display: block; font-weight: 600; margin-bottom: 8px; font-size: 14px;">
+                            Run Distance (km):
+                            <span id="runDistanceValue" style="float: right; color: #667eea; font-weight: 700;">${RaceConfig.distances.run}km</span>
+                        </label>
+                        <input type="range" id="runDistance" value="${RaceConfig.distances.run}" min="1" max="42.2" step="0.1" 
+                            style="width: 100%; cursor: pointer;">
+                        <div style="display: flex; justify-content: space-between; font-size: 11px; color: #999; margin-top: 4px;">
+                            <span>1km</span>
+                            <span>42.2km</span>
+                        </div>
+                    </div>
+                    
+                    <button class="btn" id="saveRaceConfig" style="width: 100%; padding: 12px; font-size: 16px;">
+                        💾 Save Configuration
+                    </button>
+                    
+                    <div style="margin-top: 20px; padding: 16px; background: #f0f4ff; border-radius: 8px; border-left: 4px solid #667eea;">
+                        <p style="margin: 0; font-size: 13px; color: #555;">
+                            <strong>Note:</strong> Changing these distances will update pace and speed & pace calculations throughout the application.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        settingsSection.innerHTML = html;
+        
+        // Setup event listeners
+        const raceTypeSelect = document.getElementById('raceTypeSelect');
+        const swimInput = document.getElementById('swimDistance');
+        const bikeInput = document.getElementById('bikeDistance');
+        const runInput = document.getElementById('runDistance');
+        const saveButton = document.getElementById('saveRaceConfig');
+        
+        // Update value displays
+        swimInput?.addEventListener('input', (e) => {
+            document.getElementById('swimDistanceValue').textContent = e.target.value + 'm';
+        });
+        
+        bikeInput?.addEventListener('input', (e) => {
+            document.getElementById('bikeDistanceValue').textContent = e.target.value + 'km';
+        });
+        
+        runInput?.addEventListener('input', (e) => {
+            document.getElementById('runDistanceValue').textContent = e.target.value + 'km';
+        });
+        
+        // Handle preset selection
+        raceTypeSelect?.addEventListener('change', (e) => {
+            const type = e.target.value;
+            if (type !== 'custom') {
+                RaceConfig.applyPreset(type);
+                swimInput.value = RaceConfig.distances.swim;
+                bikeInput.value = RaceConfig.distances.bike;
+                runInput.value = RaceConfig.distances.run;
+                document.getElementById('swimDistanceValue').textContent = RaceConfig.distances.swim + 'm';
+                document.getElementById('bikeDistanceValue').textContent = RaceConfig.distances.bike + 'km';
+                document.getElementById('runDistanceValue').textContent = RaceConfig.distances.run + 'km';
+            }
+        });
+        
+        // Save configuration
+        saveButton?.addEventListener('click', () => {
+            RaceConfig.setDistances(
+                parseFloat(swimInput.value),
+                parseFloat(bikeInput.value),
+                parseFloat(runInput.value)
+            );
+            
+            // Show confirmation
+            saveButton.textContent = '✓ Saved!';
+            saveButton.style.background = '#28a745';
+            
+            setTimeout(() => {
+                saveButton.textContent = '💾 Save Configuration';
+                saveButton.style.background = '';
+            }, 2000);
+            
+            // Refresh data displays
+            if (this.processedData) {
+                summaryDisplay.displayTopPerformances(this.processedData);
+            }
+            
+            // Refresh spider chart if visible
+            if (this.spiderChart && this.athleteVisibility) {
+                this.spiderChart.redraw();
+            }
+        });
+    }
+    
+
     populateDevelopmentSidebar() {
         if (!this.processedData) return;
         
@@ -372,55 +506,6 @@ class TriathlonVisualizer {
             Object.keys(this.spiderVisibility).forEach(key => {
                 this.spiderVisibility[key] = show;
             });
-        }
-    }
-    
-    setupRaceConfigDialog() {
-        const dialog = document.getElementById('raceConfigDialog');
-        if (!dialog) return;
-        
-        dialog.innerHTML = RaceConfig.createDialogHTML();
-        
-        document.getElementById('closeRaceConfig')?.addEventListener('click', () => {
-            dialog.style.display = 'none';
-        });
-        
-        document.getElementById('raceTypeSelect')?.addEventListener('change', (e) => {
-            const type = e.target.value;
-            if (type !== 'custom') {
-                RaceConfig.applyPreset(type);
-                document.getElementById('swimDistance').value = RaceConfig.distances.swim;
-                document.getElementById('bikeDistance').value = RaceConfig.distances.bike;
-                document.getElementById('runDistance').value = RaceConfig.distances.run;
-            }
-        });
-        
-        document.getElementById('saveRaceConfig')?.addEventListener('click', () => {
-            RaceConfig.setDistances(
-                parseFloat(document.getElementById('swimDistance').value),
-                parseFloat(document.getElementById('bikeDistance').value),
-                parseFloat(document.getElementById('runDistance').value)
-            );
-            dialog.style.display = 'none';
-
-            if (this.processedData) {
-                summaryDisplay.displayTopPerformances(this.processedData);
-            }
-            
-            // Refresh spider chart if active
-            if (this.currentTab === 'spider' && this.spiderChart) {
-                this.spiderChart.redraw();
-            }
-        });
-    }
-    
-    openRaceConfigDialog() {
-        const dialog = document.getElementById('raceConfigDialog');
-        if (dialog) {
-            document.getElementById('swimDistance').value = RaceConfig.distances.swim;
-            document.getElementById('bikeDistance').value = RaceConfig.distances.bike;
-            document.getElementById('runDistance').value = RaceConfig.distances.run;
-            dialog.style.display = 'flex';
         }
     }
     

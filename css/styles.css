@@ -238,6 +238,49 @@ input[type="file"] {
     background: var(--primary-color);
     color: white;
 }
+/* ========================================
+   Settings Page
+   ======================================== */
+   #settingsSection input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 6px;
+    background: #ddd;
+    border-radius: 3px;
+    outline: none;
+}
+
+#settingsSection input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    background: var(--primary-color);
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.2s;
+    padding: 20px;
+}
+
+#settingsSection input[type="range"]::-webkit-slider-thumb:hover {
+    background: var(--primary-dark);
+    transform: scale(1.2);
+}
+
+#settingsSection input[type="range"]::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    background: var(--primary-color);
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s;
+}
+
+#settingsSection input[type="range"]::-moz-range-thumb:hover {
+    background: var(--primary-dark);
+    transform: scale(1.2);
+}
 
 /* ========================================
    Chart Containers
