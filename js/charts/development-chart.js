@@ -818,7 +818,7 @@ export class DevelopmentChart extends BaseChart {
             html += `<tr>`;
             html += `<td style="padding: 4px;">Run</td>`;
             html += `<td style="padding: 4px; text-align: right;">${secondsToTime(athlete.actualRunTime)}</td>`;
-            html += `<td style="padding: 4px; text-align: right;">#${athlete.runRank || 'N/A'} (${paceStr}/km)</td>`;
+            html += `<td style="padding: 4px; text-align: right;">#${athlete.finalRank || '-'} (${paceStr}/km)</td>`;
             html += `</tr>`;
         }
         
