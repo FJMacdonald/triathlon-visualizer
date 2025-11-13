@@ -94,11 +94,6 @@ export class SidebarManager {
             html += `<button class="btn ${activeClass}" data-section="${section.key}" style="padding: 8px 12px; font-size: 13px;">${section.label}</button>`;
         });
         
-        if (!responsiveManager.isMobile) {
-            html += `<button class="btn" id="zoomModeBtn" style="padding: 8px 12px; font-size: 13px; grid-column: span 2;">🔍 Zoom (Hold Shift)</button>`;
-            html += `<button class="btn" id="resetZoomBtn" style="padding: 8px 12px; font-size: 13px; grid-column: span 2; display: none;">↩️ Reset Zoom</button>`;
-        }
-        
         html += '</div></div>';
         
         html += this.generateAthleteControls(data, {
@@ -122,41 +117,9 @@ export class SidebarManager {
             btn.addEventListener('click', () => {
                 if (onSectionChange) onSectionChange(btn.dataset.section);
                 this.updateSectionButtons(btn.dataset.section);
-                
-                const resetBtn = document.getElementById('resetZoomBtn');
-                if (resetBtn) {
-                    resetBtn.style.display = 'none';
-                }
             });
         });
-        
-        const zoomBtn = document.getElementById('zoomModeBtn');
-        const resetBtn = document.getElementById('resetZoomBtn');
-
-        zoomBtn?.addEventListener('click', () => {
-            if (onSectionChange) {
-                onSectionChange('zoom');
-            }
-            
-            this.content.querySelectorAll('[data-section]').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            zoomBtn.classList.add('active');
-            
-            if (resetBtn) {
-                resetBtn.style.display = 'block';
-            }
-        });
-
-        resetBtn?.addEventListener('click', () => {
-            if (onSectionChange) {
-                onSectionChange('reset');
-            }
-            
-            this.updateSectionButtons('all');
-            zoomBtn.classList.remove('active');
-            resetBtn.style.display = 'none';
-        });       
+          
         
         this.content.querySelector('#athleteToggleBtn')?.addEventListener('click', (e) => {
             const showAll = e.target.textContent === 'Show All';
