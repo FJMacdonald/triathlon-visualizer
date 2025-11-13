@@ -285,6 +285,29 @@ input[type="file"] {
     max-width: 100%;
     height: auto;
 }
+.chart-container div[id$="-table"] {
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-x pan-y;
+    overscroll-behavior: contain; /* Prevent scroll chaining */
+}
+
+.chart-container div[id$="-table"] table {
+    touch-action: manipulation; /* Prevent double-tap zoom */
+}
+
+.chart-container div[id$="-table"] td {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+}
+
+/* Ensure table cells are properly sized for touch */
+@media (max-width: 768px) {
+    .chart-container div[id$="-table"] td,
+    .chart-container div[id$="-table"] th {
+        padding: 12px 8px; /* Larger tap targets */
+        min-height: 44px; /* iOS recommended minimum */
+    }
+}
 
 .chart-title {
     font-size: var(--font-size-lg);
@@ -296,7 +319,16 @@ input[type="file"] {
     border-bottom: 2px solid var(--grid-color);
     margin: 0;
 }
+table td, table th {
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
+}
 
+
+.chart-container div[id*="-table"] {
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+}
 /* ========================================
    Buttons & Controls
    ======================================== */

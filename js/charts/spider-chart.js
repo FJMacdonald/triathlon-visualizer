@@ -58,11 +58,25 @@ export class SpiderChart extends BaseChart {
         tableContainer.style.flex = isMobile ? '1' : '0 0 50%';
         tableContainer.style.overflowX = 'auto';
         tableContainer.style.marginTop = isMobile ? '20px' : '0';
-        tableContainer.style.maxHeight = isMobile ? 'none' : '500px';
+        tableContainer.style.maxHeight = isMobile ? '400px' : '500px'; // Increase height on mobile
         tableContainer.style.overflowY = 'auto';
         tableContainer.style.width = '100%';
+        tableContainer.style.webkitOverflowScrolling = 'touch'; // Enable momentum scrolling
+        tableContainer.style.touchAction = 'pan-x pan-y'; // Allow both directions
         container.appendChild(tableContainer);
-        
+
+        requestAnimationFrame(() => {
+            if (isMobile) {
+                // Set explicit height for table container based on available space
+                const chartRect = chartContainer.getBoundingClientRect();
+                const viewportHeight = window.innerHeight;
+                const availableHeight = viewportHeight - chartRect.bottom - 100; // Leave some margin
+                
+                if (availableHeight > 200) {
+                    tableContainer.style.maxHeight = `${Math.min(availableHeight, 400)}px`;
+                }
+            }
+        });
         const { svg, g, width, height, margin } = this.createSVGInContainer(chartContainer);
         const radius = Math.min(width, height) / 2;
         
@@ -268,30 +282,52 @@ export class SpiderChart extends BaseChart {
             
             // Touch events for mobile
             let touchTimeout;
+            let touchStartX, touchStartY;
+            let touchMoved = false;
             area.on("touchstart", (event) => {
-                event.preventDefault();
                 if (!this.athleteVisibility[athlete.name]) return;
+                
+                // Store initial touch position
+                touchStartX = event.touches[0].clientX;
+                touchStartY = event.touches[0].clientY;
+                touchMoved = false;
+            })
+            .on("touchmove", (event) => {
+                // Check if user is scrolling
+                const touch = event.touches[0];
+                const deltaX = Math.abs(touch.clientX - touchStartX);
+                const deltaY = Math.abs(touch.clientY - touchStartY);
+                
+                if (deltaX > 10 || deltaY > 10) {
+                    touchMoved = true;
+                    tooltipManager.hide();
+                }
+            })
+            .on("touchend", (event) => {
+                if (!this.athleteVisibility[athlete.name] || touchMoved) return;
+                
+                event.preventDefault(); // Prevent click event
                 
                 d3.select(event.target)
                     .style("fill-opacity", 0.4)
                     .style("stroke-width", 3);
                 
-                const touch = event.touches[0];
+                // Use touch position from the target element instead
+                const rect = event.target.getBoundingClientRect();
+                const x = rect.left + rect.width / 2 + window.scrollX;
+                const y = rect.top + window.scrollY;
+                
                 const content = this.createPercentileTooltip(athlete, athleteData);
-                tooltipManager.show(content, touch.pageX, touch.pageY);
+                tooltipManager.show(content, x, y);
                 
                 // Auto-hide after delay
                 touchTimeout = setTimeout(() => {
                     d3.select(event.target)
                         .style("fill-opacity", 0.2)
                         .style("stroke-width", 2);
+                    tooltipManager.hide();
                 }, 3000);
-            })
-            .on("touchend", () => {
-                if (touchTimeout) clearTimeout(touchTimeout);
-            });
-            
-            // Draw dots at vertices
+            });            // Draw dots at vertices
             g.selectAll(`.radar-dots-${athleteIndex}`)
                 .data(athleteData.filter(d => !d.incomplete))
                 .enter()
@@ -411,7 +447,7 @@ export class SpiderChart extends BaseChart {
             // times (clickable to show pace)
             this.axes.forEach(ax => {
                 const cell = document.createElement('td');
-                cell.style.cssText = 'padding: 8px; border: 1px solid #ddd; text-align: center; position: relative; -webkit-tap-highlight-color: transparent;';
+                cell.style.cssText = 'padding: 8px; border: 1px solid #ddd; text-align: center;';
                 
                 let actualValue;
                 if (ax.key === 'swimTime') actualValue = athlete.actualSwimTime;
@@ -426,65 +462,39 @@ export class SpiderChart extends BaseChart {
                     
                     // Create time display
                     const timeDisplay = document.createElement('div');
-                    timeDisplay.className = 'time-display';
                     timeDisplay.textContent = timeStr;
                     timeDisplay.style.fontWeight = '500';
                     
                     // Create rank display
                     const rankDisplay = document.createElement('div');
-                    rankDisplay.className = 'rank-display';
                     rankDisplay.textContent = rank ? `#${rank}` : '';
                     rankDisplay.style.cssText = 'font-size: 11px; color: #666;';
                     
-                    // Create pace display (hidden initially)
+                    // Create pace display - ALWAYS SHOW
                     const paceDisplay = document.createElement('div');
-                    paceDisplay.className = 'pace-display';
-                    paceDisplay.style.cssText = 'display: none; font-size: 11px; color: #0066cc; margin-top: 2px; font-weight: 500;';
+                    paceDisplay.style.cssText = 'font-size: 10px; color: #0066cc; margin-top: 3px; font-weight: 500;';
                     
-                    // Calculate pace based on segment type using RaceConfig
-                    let hasPace = false;
+                    // Calculate pace based on segment type
                     if (ax.axis === 'Swim' && athlete.actualSwimTime) {
                         const swimPace = RaceConfig.getSwimPace(athlete.actualSwimTime);
                         paceDisplay.textContent = `${secondsToTime(swimPace)}/100m`;
-                        hasPace = true;
                     } else if (ax.axis === 'Bike' && athlete.actualBikeTime) {
                         const bikeSpeed = RaceConfig.getBikeSpeed(athlete.actualBikeTime);
                         paceDisplay.textContent = `${bikeSpeed.toFixed(1)} km/hr`;
-                        hasPace = true;
                     } else if (ax.axis === 'Run' && athlete.actualRunTime) {
                         const runPace = RaceConfig.getRunPace(athlete.actualRunTime);
                         const mins = Math.floor(runPace);
                         const secs = Math.round((runPace % 1) * 60);
                         paceDisplay.textContent = `${mins}:${secs.toString().padStart(2, '0')}/km`;
-                        hasPace = true;
                     }
                     
                     cell.appendChild(timeDisplay);
                     cell.appendChild(rankDisplay);
-                    cell.appendChild(paceDisplay);
-                    
-                    // Add click/touch handler to toggle pace
-                    if (hasPace) {
-                        cell.style.cursor = 'pointer';
-                        
-                        const togglePace = (e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            const isShowing = paceDisplay.style.display !== 'none';
-                            paceDisplay.style.display = isShowing ? 'none' : 'block';
-                            cell.style.backgroundColor = isShowing ? '' : '#f0f8ff';
-                        };
-                        
-                        // Support both click and touch
-                        cell.addEventListener('click', togglePace);
-                        cell.addEventListener('touchend', togglePace);
-                        cell.title = 'Tap to show/hide pace';
-                    } else {
-                        cell.style.cursor = 'default';
+                    if (paceDisplay.textContent) {
+                        cell.appendChild(paceDisplay);
                     }
                 } else {
                     cell.textContent = '-';
-                    cell.style.cursor = 'default';
                 }
                 
                 row.appendChild(cell);
@@ -497,11 +507,6 @@ export class SpiderChart extends BaseChart {
         container.innerHTML = '';
         container.appendChild(table);
         
-        // Add helper text
-        const helperText = document.createElement('p');
-        helperText.style.cssText = 'font-size: 11px; color: #888; text-align: center; margin-top: 8px;';
-        helperText.textContent = 'Tap on times to show/hide pace information';
-        container.appendChild(helperText);
     }
     
     formatTime(seconds) {
