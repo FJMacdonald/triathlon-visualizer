@@ -196,10 +196,10 @@ export class DevelopmentChart extends BaseChart {
             .append("clipPath")
             .attr("id", "chart-clip")
             .append("rect")
-            .attr("x", -5)
-            .attr("y", -5)
-            .attr("width", width + 15)
-            .attr("height", fullHeight + margin.bottom + 10);
+            .attr("x", 0)
+            .attr("y", 0)
+            .attr("width", width + 10)
+            .attr("height", fullHeight + margin.bottom);
         
         const g = svg.append('g')
             .attr('transform', `translate(${margin.left}, 5)`);
@@ -326,10 +326,10 @@ export class DevelopmentChart extends BaseChart {
             .append("clipPath")
             .attr("id", "chart-clip")
             .append("rect")
-            .attr("x", -5)
-            .attr("y", -5)
-            .attr("width", width + 15)
-            .attr("height", height + 10)
+            .attr("x", 0)
+            .attr("y", 0)
+            .attr("width", width + 10)
+            .attr("height", height + 5)
             .attr("viewBox", `0 0 ${width + margin.left + margin.right} ${height + margin.top + margin.bottom}`)
             .attr("preserveAspectRatio", "xMinYMid meet");
         
