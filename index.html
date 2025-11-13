@@ -37,6 +37,7 @@
             <p>Processing results...</p>
         </div>
 
+
         <div id="resultsSection" style="display: none;">
             <div class="tab-navigation">
                 <button class="tab-btn active" data-tab="summary">📊 Summary</button>
@@ -48,11 +49,16 @@
             </div>
 
             <div id="summarySection" class="chart-section active">
-                <div class="stats-summary" id="statsSummary"></div>
-                <div class="finishers-data" id="finishersData"></div>
-                <div class="top-performances" id="topPerformances"></div>
+                <div class="chart-container active">
+                    <div class="chart-title">📊 Race Summary</div>
+                    <div class="page-content">
+                        <div class="finishers-data" id="finishersData"></div>
+                        <div class="top-performances" id="topPerformances"></div>
+                    </div>
+                </div>
             </div>
-            
+
+         
             <div id="rankSection" class="chart-section">
                 <div class="chart-container active">
                     <div class="chart-title">Race Position Changes</div>
@@ -73,16 +79,21 @@
                     <div id="spiderChart"></div>
                 </div>
             </div>
+                        <div id="teamsSection" class="chart-section">
+                <div class="chart-container active">
+                    <div class="chart-title" id="teamsTitle">🏅 Team Performances</div>
+                    <div class="page-content" id="teamsContent"></div>
+                </div>
+            </div>
+
+            <div id="settingsSection" class="chart-section">
+                <div class="chart-container active">
+                    <div class="chart-title">⚙️ Race Configuration</div>
+                    <div class="page-content" id="settingsContent"></div>
+                </div>
+            </div>   
         </div>
-    </div><div id="teamsSection" class="chart-section">
-        <div class="chart-container active">
-            <div class="chart-title">Team Performances</div>
-            <div id="teamsContent"></div>
-        </div>
-    </div>
-    <div id="settingsSection" class="chart-section">
-        <!-- Content will be injected by JS -->
-    </div>
+
     <div class="tooltip" id="tooltip"></div>
     
     <!-- Dialogs -->

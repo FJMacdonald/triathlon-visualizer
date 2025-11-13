@@ -3,23 +3,16 @@ import { RaceConfig } from '../config/race-config.js';
 
 export class SummaryDisplay {
     constructor() {
-        this.summaryContainer = document.getElementById('statsSummary');
         this.finishersContainer = document.getElementById('finishersData');
         this.performancesContainer = document.getElementById('topPerformances');
     }
     
     displayAll(data) {
-        this.displayStats(data);
         this.displayFinishers(data);
         this.displayTopPerformances(data);
     }
     
-    displayStats(data) {
-        // Stats are now shown in finishers section
-        if (this.summaryContainer) {
-            this.summaryContainer.innerHTML = '';
-        }
-    }
+
     
     displayFinishers(data) {
         if (!this.finishersContainer) return;

@@ -20,13 +20,21 @@ export const RaceConfig = {
         this.distances.run = run;
     },
     
-    applyPreset(presetName) {
-        const preset = this.presets[presetName];
-        if (preset) {
-            this.setDistances(preset.swim, preset.bike, preset.run);
-            return true;
+    applyPreset(type) {
+        const presets = {
+            'sprint': { swim: 750, bike: 20, run: 5 },
+            'olympic': { swim: 1500, bike: 40, run: 10 },
+            'standard': { swim: 1500, bike: 40, run: 10 }
+        };
+        
+        if (presets[type]) {
+            this.setDistances(
+                presets[type].swim,
+                presets[type].bike,
+                presets[type].run
+            );
+            console.log(`Applied ${type} distance preset`);
         }
-        return false;
     },
     
     getSwimPace(timeInSeconds) {

@@ -8,7 +8,7 @@ import { sidebarManager } from './ui/sidebar.js';
 import { summaryDisplay } from './ui/controls.js';
 import { hypotheticalAnalysis } from './hypothetical.js';
 import { responsiveManager } from './utils/responsive.js';
-import { secondsToTime, secondsToMinSec, getFlag } from './utils/formatters.js';
+import { secondsToTime, secondsToMinSec, getFlag, getTeamIcon } from './utils/formatters.js';
 
 class TriathlonVisualizer {
     constructor() {
@@ -71,6 +71,12 @@ class TriathlonVisualizer {
     }
     
     initializeCharts(data) {
+        // Apply race config based on detected distance
+        if (dataProcessor.raceDistance === 'sprint') {
+            RaceConfig.applyPreset('sprint');
+        } else {
+            RaceConfig.applyPreset('olympic');
+        }
         // Create color scale
         this.colorScale = ChartConfig.createColorScale(data);
         
@@ -241,7 +247,7 @@ class TriathlonVisualizer {
             case 'teams':
                 sidebarManager.hide();
                 this.displayTeamPerformances();
-                break;
+                break;                
                 
             case 'settings':
                 sidebarManager.hide();
@@ -251,76 +257,71 @@ class TriathlonVisualizer {
     }
 
     displaySettingsPage() {
-        const settingsSection = document.getElementById('settingsSection');
-        if (!settingsSection) return;
+        const settingsContent = document.getElementById('settingsContent');
+        if (!settingsContent) return;
         
         const html = `
-            <div class="chart-container active" style="max-width: 800px; margin: 0 auto;">
-                <div class="chart-title">⚙️ Race Configuration</div>
-                <div style="padding: 20px;">
-                    <div class="control-group" style="margin-bottom: 24px;">
-                        <label style="display: block; font-weight: 600; margin-bottom: 8px; font-size: 14px;">Race Type:</label>
-                        <select id="raceTypeSelect" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px;">
-                            <option value="standard">Standard Distance (1.5km / 40km / 10km)</option>
-                            <option value="sprint">Sprint Distance (750m / 20km / 5km)</option>
-                            <option value="olympic">Olympic Distance (1.5km / 40km / 10km)</option>
-                            <option value="custom">Custom</option>
-                        </select>
-                    </div>
-                    
-                    <div class="control-group" style="margin-bottom: 20px;">
-                        <label style="display: block; font-weight: 600; margin-bottom: 8px; font-size: 14px;">
-                            Swim Distance (meters):
-                            <span id="swimDistanceValue" style="float: right; color: #667eea; font-weight: 700;">${RaceConfig.distances.swim}m</span>
-                        </label>
-                        <input type="range" id="swimDistance" value="${RaceConfig.distances.swim}" min="100" max="3800" step="50" 
-                            style="width: 100%; cursor: pointer;">
-                        <div style="display: flex; justify-content: space-between; font-size: 11px; color: #999; margin-top: 4px;">
-                            <span>100m</span>
-                            <span>3800m</span>
-                        </div>
-                    </div>
-                    
-                    <div class="control-group" style="margin-bottom: 20px;">
-                        <label style="display: block; font-weight: 600; margin-bottom: 8px; font-size: 14px;">
-                            Bike Distance (km):
-                            <span id="bikeDistanceValue" style="float: right; color: #667eea; font-weight: 700;">${RaceConfig.distances.bike}km</span>
-                        </label>
-                        <input type="range" id="bikeDistance" value="${RaceConfig.distances.bike}" min="5" max="180" step="1" 
-                            style="width: 100%; cursor: pointer;">
-                        <div style="display: flex; justify-content: space-between; font-size: 11px; color: #999; margin-top: 4px;">
-                            <span>5km</span>
-                            <span>180km</span>
-                        </div>
-                    </div>
-                    
-                    <div class="control-group" style="margin-bottom: 24px;">
-                        <label style="display: block; font-weight: 600; margin-bottom: 8px; font-size: 14px;">
-                            Run Distance (km):
-                            <span id="runDistanceValue" style="float: right; color: #667eea; font-weight: 700;">${RaceConfig.distances.run}km</span>
-                        </label>
-                        <input type="range" id="runDistance" value="${RaceConfig.distances.run}" min="1" max="42.2" step="0.1" 
-                            style="width: 100%; cursor: pointer;">
-                        <div style="display: flex; justify-content: space-between; font-size: 11px; color: #999; margin-top: 4px;">
-                            <span>1km</span>
-                            <span>42.2km</span>
-                        </div>
-                    </div>
-                    
-                    <button class="btn" id="saveRaceConfig" style="width: 100%; padding: 12px; font-size: 16px;">
-                        💾 Save Configuration
-                    </button>
-                    
-                    <div style="margin-top: 20px; padding: 16px; background: #f0f4ff; border-radius: 8px; border-left: 4px solid #667eea;">
-                        <p style="margin: 0; font-size: 13px; color: #555;">
-                            <strong>Note:</strong> Changing these distances will update pace and speed & pace calculations throughout the application.
-                        </p>
-                    </div>
+            <div class="settings-group">
+                <label style="display: block; font-weight: 600; margin-bottom: 8px; font-size: 14px;">Race Type:</label>
+                <select id="raceTypeSelect" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px;">
+                    <option value="standard">Standard Distance (1.5km / 40km / 10km)</option>
+                    <option value="sprint">Sprint Distance (750m / 20km / 5km)</option>
+                    <option value="olympic">Olympic Distance (1.5km / 40km / 10km)</option>
+                    <option value="custom">Custom</option>
+                </select>
+            </div>
+            
+            <div class="settings-group">
+                <label style="display: block; font-weight: 600; margin-bottom: 8px; font-size: 14px;">
+                    Swim Distance (meters):
+                    <span id="swimDistanceValue" style="float: right; color: #667eea; font-weight: 700;">${RaceConfig.distances.swim}m</span>
+                </label>
+                <input type="range" id="swimDistance" value="${RaceConfig.distances.swim}" min="100" max="3800" step="50" 
+                    style="width: 100%; cursor: pointer;">
+                <div style="display: flex; justify-content: space-between; font-size: 11px; color: #999; margin-top: 4px;">
+                    <span>100m</span>
+                    <span>3800m</span>
                 </div>
+            </div>
+            
+            <div class="settings-group">
+                <label style="display: block; font-weight: 600; margin-bottom: 8px; font-size: 14px;">
+                    Bike Distance (km):
+                    <span id="bikeDistanceValue" style="float: right; color: #667eea; font-weight: 700;">${RaceConfig.distances.bike}km</span>
+                </label>
+                <input type="range" id="bikeDistance" value="${RaceConfig.distances.bike}" min="5" max="180" step="1" 
+                    style="width: 100%; cursor: pointer;">
+                <div style="display: flex; justify-content: space-between; font-size: 11px; color: #999; margin-top: 4px;">
+                    <span>5km</span>
+                    <span>180km</span>
+                </div>
+            </div>
+            
+            <div class="settings-group">
+                <label style="display: block; font-weight: 600; margin-bottom: 8px; font-size: 14px;">
+                    Run Distance (km):
+                    <span id="runDistanceValue" style="float: right; color: #667eea; font-weight: 700;">${RaceConfig.distances.run}km</span>
+                </label>
+                <input type="range" id="runDistance" value="${RaceConfig.distances.run}" min="1" max="42.2" step="0.1" 
+                    style="width: 100%; cursor: pointer;">
+                <div style="display: flex; justify-content: space-between; font-size: 11px; color: #999; margin-top: 4px;">
+                    <span>1km</span>
+                    <span>42.2km</span>
+                </div>
+            </div>
+            
+            <button class="btn" id="saveRaceConfig" style="width: 100%; padding: 12px; font-size: 16px;">
+                💾 Save Configuration
+            </button>
+            
+            <div class="country-info-box" style="margin-top: var(--spacing-lg);">
+                <p style="margin: 0; font-size: 13px;">
+                    <strong>Note:</strong> Changing these distances will update pace and speed calculations throughout the application.
+                </p>
             </div>
         `;
         
-        settingsSection.innerHTML = html;
+        settingsContent.innerHTML = html;
         
         // Setup event listeners
         const raceTypeSelect = document.getElementById('raceTypeSelect');
@@ -383,8 +384,7 @@ class TriathlonVisualizer {
                 this.spiderChart.redraw();
             }
         });
-    }
-    
+    }    
 
     populateDevelopmentSidebar() {
         if (!this.processedData) return;
@@ -526,13 +526,22 @@ class TriathlonVisualizer {
             }
         });
     }
+
     displayTeamPerformances() {
         if (!this.processedData) return;
         
         const teamsContent = document.getElementById('teamsContent'); 
+        const teamsTitle = document.getElementById('teamsTitle');
         if (!teamsContent) return;
         
-        // Group athletes by country
+        const isNCAA = dataProcessor.isNCAA();
+        
+        // Update title based on race type
+        if (teamsTitle) {
+            teamsTitle.textContent = isNCAA ? '🏅 Team Performances' : '🌍 Country Analysis';
+        }
+        
+        // Group athletes by country/team
         const teams = {};
         this.processedData.forEach(athlete => {
             if (!teams[athlete.country]) {
@@ -541,91 +550,134 @@ class TriathlonVisualizer {
             teams[athlete.country].push(athlete);
         });
         
-        // Calculate team scores (top 5 score, next 2 displace)
-        const teamScores = [];
+        // Calculate team statistics
+        const teamStats = [];
         Object.keys(teams).forEach(country => {
             const athletes = teams[country];
             const finishers = athletes
                 .filter(a => a.finalRank)
                 .sort((a, b) => a.finalRank - b.finalRank);
             
-            if (finishers.length >= 5) {
-                const scoringAthletes = finishers.slice(0, 5);
-                const score = scoringAthletes.reduce((sum, a) => sum + a.finalRank, 0);
-                const displacers = finishers.slice(5, 7);
-                
-                // Calculate team averages for scoring athletes
-                const avgSwimPace = scoringAthletes.reduce((sum, a) => sum + (a.actualSwimTime / RaceConfig.distances.swim) * 100, 0) / 5;
-                const avgBikeSpeed = scoringAthletes.reduce((sum, a) => sum + (RaceConfig.distances.bike / (a.actualBikeTime / 3600)), 0) / 5;
-                const avgRunPace = scoringAthletes.reduce((sum, a) => sum + (a.actualRunTime / RaceConfig.distances.run / 60), 0) / 5;
-                
-                teamScores.push({
-                    country,
-                    score,
-                    scoringAthletes,
-                    displacers,
-                    allAthletes: athletes,
-                    complete: true,
-                    avgSwimPace,
-                    avgBikeSpeed,
-                    avgRunPace
-                });
-            } else if (finishers.length > 0) {
-                const score = finishers.reduce((sum, a) => sum + a.finalRank, 0) + 
-                            (5 - finishers.length) * 100;
-                
-                const avgSwimPace = finishers.reduce((sum, a) => sum + (a.actualSwimTime / RaceConfig.distances.swim) * 100, 0) / finishers.length;
-                const avgBikeSpeed = finishers.reduce((sum, a) => sum + (RaceConfig.distances.bike / (a.actualBikeTime / 3600)), 0) / finishers.length;
-                const avgRunPace = finishers.reduce((sum, a) => sum + (a.actualRunTime / RaceConfig.distances.run / 60), 0) / finishers.length;
-                
-                teamScores.push({
-                    country,
-                    score,
-                    scoringAthletes: finishers,
-                    displacers: [],
-                    allAthletes: athletes,
-                    complete: false,
-                    avgSwimPace,
-                    avgBikeSpeed,
-                    avgRunPace
-                });
+            if (finishers.length === 0) return;
+            
+            // Calculate average finish position
+            const avgPosition = finishers.reduce((sum, a) => sum + a.finalRank, 0) / finishers.length;
+            
+            // Calculate average finish time
+            const avgFinishTime = finishers.reduce((sum, a) => sum + a.actualTotalTime, 0) / finishers.length;
+            
+            // For NCAA: top 5 scoring
+            let score = null;
+            let scoringAthletes = [];
+            let displacers = [];
+            let complete = false;
+            
+            if (isNCAA) {
+                if (finishers.length >= 5) {
+                    scoringAthletes = finishers.slice(0, 5);
+                    score = scoringAthletes.reduce((sum, a) => sum + a.finalRank, 0);
+                    displacers = finishers.slice(5, 7);
+                    complete = true;
+                } else {
+                    scoringAthletes = finishers;
+                    score = finishers.reduce((sum, a) => sum + a.finalRank, 0) + 
+                        (5 - finishers.length) * 100;
+                    complete = false;
+                }
+            } else {
+                // For World Triathlon, use all finishers
+                scoringAthletes = finishers;
             }
+            
+            // Calculate team averages
+            const avgSwimPace = scoringAthletes.reduce((sum, a) => 
+                sum + (a.actualSwimTime / RaceConfig.distances.swim) * 100, 0) / scoringAthletes.length;
+            const avgBikeSpeed = scoringAthletes.reduce((sum, a) => 
+                sum + (RaceConfig.distances.bike / (a.actualBikeTime / 3600)), 0) / scoringAthletes.length;
+            const avgRunPace = scoringAthletes.reduce((sum, a) => 
+                sum + (a.actualRunTime / RaceConfig.distances.run / 60), 0) / scoringAthletes.length;
+            
+            teamStats.push({
+                country,
+                score,
+                avgPosition,
+                avgFinishTime,
+                scoringAthletes,
+                displacers,
+                allAthletes: athletes,
+                finishers,
+                complete,
+                avgSwimPace,
+                avgBikeSpeed,
+                avgRunPace
+            });
         });
         
-        // Sort by score (lower is better)
-        teamScores.sort((a, b) => a.score - b.score);
+        // Sort by appropriate metric
+        if (isNCAA) {
+            teamStats.sort((a, b) => a.score - b.score);
+        } else {
+            teamStats.sort((a, b) => a.avgFinishTime - b.avgFinishTime);
+        }
         
         // Get team color
-        const getTeamColor = (country) => {
+        const getTeamColorForDisplay = (country) => {
             const teamAthlete = this.processedData.find(a => a.country === country);
             return teamAthlete ? this.colorScale(teamAthlete.name) : '#666';
         };
         
-        let html = '<div class="team-rankings">';
+        // Get team icon/flag
+        const getTeamIconForDisplay = (country) => {
+            if (isNCAA) {
+                return getTeamIcon(country, true);
+            }
+            return getFlag(country);
+        };
+        
+        let html = '';
+        
+        // Add info box for World Triathlon
+        if (!isNCAA) {
+            html += `
+                <div class="country-info-box">
+                    <h3>📊 Country Performance Analysis</h3>
+                    <p>Athletes grouped by country and ranked by average finishing time. 
+                    This analysis shows which countries had the strongest overall performances.</p>
+                </div>
+            `;
+        }
+        
+        html += `<div class="${isNCAA ? 'team-rankings' : 'country-rankings'}">`;
         
         const medals = ['🥇', '🥈', '🥉'];
         const podiumColors = ['#FFD700', '#C0C0C0', '#CD7F32'];
         
-        teamScores.forEach((team, index) => {
-            const flag = getFlag(team.country);
+        teamStats.forEach((team, index) => {
+            const teamIcon = getTeamIconForDisplay(team.country);
             const medal = index < 3 ? medals[index] : `${index + 1}.`;
             const borderColor = index < 3 ? podiumColors[index] : '#ddd';
-            const teamColor = getTeamColor(team.country);
+            const teamColor = getTeamColorForDisplay(team.country);
             
-            // Format averages
+            // Format statistics
             const avgSwimFormatted = secondsToTime(team.avgSwimPace) + '/100m';
             const avgBikeFormatted = team.avgBikeSpeed.toFixed(1) + ' km/h';
             const avgRunMins = Math.floor(team.avgRunPace);
             const avgRunSecs = Math.round((team.avgRunPace % 1) * 60);
             const avgRunFormatted = `${avgRunMins}:${avgRunSecs.toString().padStart(2, '0')}/km`;
             
+            const avgFinishFormatted = secondsToTime(team.avgFinishTime);
+            const athleteCount = team.finishers.length;
+            
             html += `
                 <div class="team-row ${index < 3 ? 'podium' : ''}" style="border-left: 4px solid ${borderColor};">
                     <div class="team-summary" onclick="this.parentElement.classList.toggle('expanded')">
                         <div class="team-rank">${medal}</div>
                         <div class="team-info">
-                            <span class="team-name" style="color: ${teamColor};">${flag} ${team.country}</span>
-                            <span class="team-score">${team.score}${!team.complete ? '*' : ''} pts</span>
+                            <span class="team-name" style="color: ${teamColor};">${teamIcon} ${team.country}</span>
+                            ${isNCAA ? 
+                                `<span class="team-score">${team.score}${!team.complete ? '*' : ''} pts</span>` :
+                                `<span class="team-score">Avg: ${avgFinishFormatted} (${athleteCount} athlete${athleteCount !== 1 ? 's' : ''})</span>`
+                            }
                         </div>
                         <div class="team-averages">
                             <span class="avg swim" title="Avg Swim Pace">🏊 ${avgSwimFormatted}</span>
@@ -633,8 +685,14 @@ class TriathlonVisualizer {
                             <span class="avg run" title="Avg Run Pace">🏃 ${avgRunFormatted}</span>
                         </div>
                         <div class="scoring-positions">
-                            ${team.scoringAthletes.map(a => `<span class="pos scoring" style="background: ${teamColor};">#${a.finalRank}</span>`).join('')}
-                            ${team.displacers.map(a => `<span class="pos displacer">#${a.finalRank}</span>`).join('')}
+                            ${team.scoringAthletes.map(a => 
+                                `<span class="pos ${isNCAA && team.scoringAthletes.indexOf(a) < 5 ? 'scoring' : 'counting'}" 
+                                    style="background: ${teamColor};">#${a.finalRank}</span>`
+                            ).join('')}
+                            ${isNCAA && team.displacers.length > 0 ? 
+                                team.displacers.map(a => `<span class="pos displacer">#${a.finalRank}</span>`).join('') : 
+                                ''
+                            }
                         </div>
                         <div class="expand-icon">▼</div>
                     </div>
@@ -651,16 +709,20 @@ class TriathlonVisualizer {
                                 </tr>
                             </thead>
                             <tbody>
-                                ${team.scoringAthletes.map(athlete => this.createAthleteTableRow(athlete, true, teamColor)).join('')}
-                                ${team.displacers.length > 0 ? `
+                                ${team.scoringAthletes.map((athlete, idx) => 
+                                    this.createAthleteTableRow(athlete, isNCAA && idx < 5, teamColor)
+                                ).join('')}
+                                ${isNCAA && team.displacers.length > 0 ? `
                                     <tr class="divider-row"><td colspan="6">Displacers</td></tr>
-                                    ${team.displacers.map(athlete => this.createAthleteTableRow(athlete, false, teamColor)).join('')}
+                                    ${team.displacers.map(athlete => 
+                                        this.createAthleteTableRow(athlete, false, teamColor)
+                                    ).join('')}
                                 ` : ''}
                             </tbody>
                         </table>
                         ${team.allAthletes.length > team.scoringAthletes.length + team.displacers.length ? `
                             <div class="other-athletes">
-                                Other: ${team.allAthletes
+                                ${isNCAA ? 'Other:' : 'Did not finish:'} ${team.allAthletes
                                     .filter(a => !team.scoringAthletes.includes(a) && !team.displacers.includes(a))
                                     .map(a => `${a.baseName} (${a.finalRank ? '#' + a.finalRank : a.status})`)
                                     .join(', ')}
@@ -673,199 +735,199 @@ class TriathlonVisualizer {
         
         html += '</div>';
         
-        if (teamScores.some(t => !t.complete)) {
-            html += '<p class="scoring-note">* Team did not have 5 finishers. Penalty of 100 points per missing athlete applied.</p>';
+        // Footer notes
+        if (isNCAA) {
+            if (teamStats.some(t => !t.complete)) {
+                html += '<p class="scoring-note">* Team did not have 5 finishers. Penalty of 100 points per missing athlete applied.</p>';
+            }
+            html += `
+                <div class="scoring-rules">
+                    <strong>NCAA Scoring:</strong> Sum of positions for top 5 finishers (lower is better). 
+                    Next 2 finishers are displacers. Averages based on scoring athletes only.
+                </div>
+            `;
+        } else {
+            html += `
+                <div class="scoring-rules">
+                    <strong>Analysis Method:</strong> Countries ranked by average finishing time of all finishers. 
+                    Performance averages calculated across all athletes from each country.
+                </div>
+            `;
         }
-        
-        html += `
-            <div class="scoring-rules">
-                <strong>Scoring:</strong> Sum of positions for top 5 finishers (lower is better). 
-                Next 2 finishers are displacers. Averages based on scoring athletes only.
-            </div>
-        `;
-        
-        // Add styles
-        html += `
-            <style>
-                .team-rankings {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 3px;
-                }
-                .team-row {
-                    background: white;
-                    border-radius: 4px;
-                    overflow: hidden;
-                    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-                }
-                .team-row.podium {
-                    background: linear-gradient(to right, #fffdf5, white);
-                }
-                .team-summary {
-                    display: flex;
-                    align-items: center;
-                    padding: 10px 12px;
-                    cursor: pointer;
-                    user-select: none;
-                    gap: 10px;
-                    transition: background 0.2s;
-                }
-                .team-summary:hover {
-                    background: rgba(0,0,0,0.03);
-                }
-                .team-rank {
-                    font-size: 16px;
-                    font-weight: 700;
-                    min-width: 32px;
-                    color: #333;
-                }
-                .team-info {
-                    display: flex;
-                    flex-direction: column;
-                    min-width: 100px;
-                }
-                .team-name {
-                    font-weight: 700;
-                    font-size: 14px;
-                }
-                .team-score {
-                    font-size: 12px;
-                    color: #666;
-                    font-weight: 500;
-                }
-                .team-averages {
-                    display: flex;
-                    gap: 8px;
-                    font-size: 11px;
-                    color: #555;
-                }
-                .avg {
-                    background: #f5f5f5;
-                    padding: 2px 6px;
-                    border-radius: 3px;
-                    white-space: nowrap;
-                }
-                .avg.swim { border-left: 2px solid #0891b2; }
-                .avg.bike { border-left: 2px solid #059669; }
-                .avg.run { border-left: 2px solid #dc2626; }
-                .scoring-positions {
-                    display: flex;
-                    gap: 3px;
-                    flex-wrap: wrap;
-                    flex: 1;
-                    justify-content: flex-end;
-                }
-                .pos {
-                    padding: 2px 6px;
-                    border-radius: 3px;
-                    font-size: 10px;
-                    font-weight: 600;
-                }
-                .pos.scoring {
-                    color: white;
-                }
-                .pos.displacer {
-                    background: #e0e0e0;
-                    color: #666;
-                }
-                .expand-icon {
-                    color: #999;
-                    font-size: 10px;
-                    transition: transform 0.3s ease;
-                    margin-left: 4px;
-                }
-                .team-row.expanded .expand-icon {
-                    transform: rotate(180deg);
-                }
-                .team-details {
-                    display: none;
-                    padding: 8px 12px 12px 12px;
-                    background: #fafafa;
-                    border-top: 1px solid #eee;
-                }
-                .team-row.expanded .team-details {
-                    display: block;
-                }
-                .athletes-table {
-                    width: 100%;
-                    border-collapse: collapse;
-                    font-size: 11px;
-                }
-                .athletes-table th {
-                    text-align: left;
-                    padding: 4px 8px;
-                    font-weight: 600;
-                    color: #666;
-                    border-bottom: 1px solid #ddd;
-                    font-size: 10px;
-                    text-transform: uppercase;
-                }
-                .athletes-table td {
-                    padding: 6px 8px;
-                    border-bottom: 1px solid #eee;
-                }
-                .athletes-table tr:last-child td {
-                    border-bottom: none;
-                }
-                .athletes-table .athlete-name-cell {
-                    font-weight: 600;
-                }
-                .athletes-table .time-cell {
-                    font-family: monospace;
-                }
-                .athletes-table .pace-cell {
-                    font-size: 10px;
-                    color: #888;
-                }
-                .athletes-table tr.displacer {
-                    opacity: 0.7;
-                    background: #f5f5f5;
-                }
-                .divider-row td {
-                    font-size: 9px;
-                    font-weight: 600;
-                    color: #999;
-                    text-transform: uppercase;
-                    letter-spacing: 0.5px;
-                    padding: 8px;
-                    border-bottom: 1px dashed #ddd;
-                    background: #f0f0f0;
-                }
-                .other-athletes {
-                    margin-top: 8px;
-                    font-size: 10px;
-                    color: #888;
-                    font-style: italic;
-                }
-                .scoring-note {
-                    font-size: 11px;
-                    color: #666;
-                    margin-top: 12px;
-                }
-                .scoring-rules {
-                    margin-top: 12px;
-                    padding: 10px 14px;
-                    background: #f8f9fa;
-                    border-radius: 6px;
-                    font-size: 11px;
-                    color: #555;
-                    border: 1px solid #e0e7ff;
-                }
-                
-                @media (max-width: 768px) {
-                    .team-averages {
-                        display: none;
-                    }
-                    .athletes-table {
-                        font-size: 10px;
-                    }
-                }
-            </style>
-        `;
         
         teamsContent.innerHTML = html;
     }
-
+        /*
+       displayTeamPerformances() {
+           if (!this.processedData) return;
+           
+           const teamsContent = document.getElementById('teamsContent'); 
+           if (!teamsContent) return;
+           
+           // Group athletes by country
+           const teams = {};
+           this.processedData.forEach(athlete => {
+               if (!teams[athlete.country]) {
+                   teams[athlete.country] = [];
+               }
+               teams[athlete.country].push(athlete);
+           });
+           
+           // Calculate team scores (top 5 score, next 2 displace)
+           const teamScores = [];
+           Object.keys(teams).forEach(country => {
+               const athletes = teams[country];
+               const finishers = athletes
+                   .filter(a => a.finalRank)
+                   .sort((a, b) => a.finalRank - b.finalRank);
+               
+               if (finishers.length >= 5) {
+                   const scoringAthletes = finishers.slice(0, 5);
+                   const score = scoringAthletes.reduce((sum, a) => sum + a.finalRank, 0);
+                   const displacers = finishers.slice(5, 7);
+                   
+                   const avgSwimPace = scoringAthletes.reduce((sum, a) => sum + (a.actualSwimTime / RaceConfig.distances.swim) * 100, 0) / 5;
+                   const avgBikeSpeed = scoringAthletes.reduce((sum, a) => sum + (RaceConfig.distances.bike / (a.actualBikeTime / 3600)), 0) / 5;
+                   const avgRunPace = scoringAthletes.reduce((sum, a) => sum + (a.actualRunTime / RaceConfig.distances.run / 60), 0) / 5;
+                   
+                   teamScores.push({
+                       country,
+                       score,
+                       scoringAthletes,
+                       displacers,
+                       allAthletes: athletes,
+                       complete: true,
+                       avgSwimPace,
+                       avgBikeSpeed,
+                       avgRunPace
+                   });
+               } else if (finishers.length > 0) {
+                   const score = finishers.reduce((sum, a) => sum + a.finalRank, 0) + 
+                               (5 - finishers.length) * 100;
+                   
+                   const avgSwimPace = finishers.reduce((sum, a) => sum + (a.actualSwimTime / RaceConfig.distances.swim) * 100, 0) / finishers.length;
+                   const avgBikeSpeed = finishers.reduce((sum, a) => sum + (RaceConfig.distances.bike / (a.actualBikeTime / 3600)), 0) / finishers.length;
+                   const avgRunPace = finishers.reduce((sum, a) => sum + (a.actualRunTime / RaceConfig.distances.run / 60), 0) / finishers.length;
+                   
+                   teamScores.push({
+                       country,
+                       score,
+                       scoringAthletes: finishers,
+                       displacers: [],
+                       allAthletes: athletes,
+                       complete: false,
+                       avgSwimPace,
+                       avgBikeSpeed,
+                       avgRunPace
+                   });
+               }
+           });
+           
+           teamScores.sort((a, b) => a.score - b.score);
+           
+           const getTeamColorForDisplay = (country) => {
+               const teamAthlete = this.processedData.find(a => a.country === country);
+               return teamAthlete ? this.colorScale(teamAthlete.name) : '#666';
+           };
+           
+           const getTeamIconForDisplay = (country) => {
+               if (dataProcessor.isNCAA()) {
+                   return getTeamIcon(country, true);
+               }
+               return getFlag(country);
+           };
+           
+           let html = `
+               <div class="page-header">
+                   <h2>🏆 NCAA Team Standings</h2>
+                   <p class="page-description">Cross-country style scoring: Top 5 score, next 2 displace</p>
+               </div>
+               <div class="team-rankings">
+           `;
+           
+           const medals = ['🥇', '🥈', '🥉'];
+           const podiumColors = ['#FFD700', '#C0C0C0', '#CD7F32'];
+           
+           teamScores.forEach((team, index) => {
+               const teamIcon = getTeamIconForDisplay(team.country);
+               const medal = index < 3 ? medals[index] : `${index + 1}.`;
+               const borderColor = index < 3 ? podiumColors[index] : '#ddd';
+               const teamColor = getTeamColorForDisplay(team.country);
+               
+               const avgSwimFormatted = secondsToTime(team.avgSwimPace) + '/100m';
+               const avgBikeFormatted = team.avgBikeSpeed.toFixed(1) + ' km/h';
+               const avgRunMins = Math.floor(team.avgRunPace);
+               const avgRunSecs = Math.round((team.avgRunPace % 1) * 60);
+               const avgRunFormatted = `${avgRunMins}:${avgRunSecs.toString().padStart(2, '0')}/km`;
+               
+               html += `
+                   <div class="team-row ${index < 3 ? 'podium' : ''}" style="border-left: 4px solid ${borderColor};">
+                       <div class="team-summary" onclick="this.parentElement.classList.toggle('expanded')">
+                           <div class="team-rank">${medal}</div>
+                           <div class="team-info">
+                               <span class="team-name" style="color: ${teamColor};">${teamIcon} ${team.country}</span>
+                               <span class="team-score">${team.score}${!team.complete ? '*' : ''} pts</span>
+                           </div>
+                           <div class="team-averages">
+                               <span class="avg swim" title="Avg Swim Pace">🏊 ${avgSwimFormatted}</span>
+                               <span class="avg bike" title="Avg Bike Speed">🚴 ${avgBikeFormatted}</span>
+                               <span class="avg run" title="Avg Run Pace">🏃 ${avgRunFormatted}</span>
+                           </div>
+                           <div class="scoring-positions">
+                               ${team.scoringAthletes.map(a => `<span class="pos scoring" style="background: ${teamColor};">#${a.finalRank}</span>`).join('')}
+                               ${team.displacers.map(a => `<span class="pos displacer">#${a.finalRank}</span>`).join('')}
+                           </div>
+                           <div class="expand-icon">▼</div>
+                       </div>
+                       <div class="team-details">
+                           <table class="athletes-table">
+                               <thead>
+                                   <tr>
+                                       <th>Pos</th>
+                                       <th>Athlete</th>
+                                       <th>Total</th>
+                                       <th>Swim</th>
+                                       <th>Bike</th>
+                                       <th>Run</th>
+                                   </tr>
+                               </thead>
+                               <tbody>
+                                   ${team.scoringAthletes.map(athlete => this.createAthleteTableRow(athlete, true, teamColor)).join('')}
+                                   ${team.displacers.length > 0 ? `
+                                       <tr class="divider-row"><td colspan="6">Displacers</td></tr>
+                                       ${team.displacers.map(athlete => this.createAthleteTableRow(athlete, false, teamColor)).join('')}
+                                   ` : ''}
+                               </tbody>
+                           </table>
+                           ${team.allAthletes.length > team.scoringAthletes.length + team.displacers.length ? `
+                               <div class="other-athletes">
+                                   Other: ${team.allAthletes
+                                       .filter(a => !team.scoringAthletes.includes(a) && !team.displacers.includes(a))
+                                       .map(a => `${a.baseName} (${a.finalRank ? '#' + a.finalRank : a.status})`)
+                                       .join(', ')}
+                               </div>
+                           ` : ''}
+                       </div>
+                   </div>
+               `;
+           });
+           
+           html += '</div>';
+           
+           if (teamScores.some(t => !t.complete)) {
+               html += '<p class="scoring-note">* Team did not have 5 finishers. Penalty of 100 points per missing athlete applied.</p>';
+           }
+           
+           html += `
+               <div class="scoring-rules">
+                   <strong>Scoring:</strong> Sum of positions for top 5 finishers (lower is better). 
+                   Next 2 finishers are displacers. Averages based on scoring athletes only.
+               </div>
+           `;
+       
+           teamsContent.innerHTML = html;
+       }
+           */
     createAthleteTableRow(athlete, isScoring, teamColor) {
         const swimPace = athlete.actualSwimTime ? 
             secondsToTime((athlete.actualSwimTime / RaceConfig.distances.swim) * 100) + '/100m' : 'N/A';
@@ -899,9 +961,6 @@ class TriathlonVisualizer {
             </tr>
         `;
     }
-
-
-
 }
 
 // Initialize application when DOM is ready
