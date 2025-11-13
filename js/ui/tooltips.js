@@ -119,45 +119,7 @@ export class TooltipManager {
             .style('opacity', 0);
     }
  
-    
-    // Generate tooltip content for athlete summary
-    athleteSummary(athlete) {
-        const name = athlete.baseName || athlete.name.replace(/ \([^)]*\)$/, '');
-        let content = `<strong>${name} (${athlete.finalRank || 'N/A'}) ${athlete.country}</strong><br/>`;
         
-        if (athlete.actualSwimTime) {
-            content += `Swim: ${secondsToTime(athlete.actualSwimTime)} (${athlete.swimSegmentRank || 'N/A'})<br/>`;
-        }
-        if (athlete.actualT1Time) {
-            content += `T1: ${secondsToTime(athlete.actualT1Time)} (${athlete.t1SegmentRank || 'N/A'})<br/>`;
-        }
-        if (athlete.actualBikeTime) {
-            content += `Bike: ${secondsToTime(athlete.actualBikeTime)} (${athlete.bikeSegmentRank || 'N/A'})<br/>`;
-        } else if (athlete.status === 'DNF' || athlete.status === 'LAP') {
-            content += `Bike: DNF<br/>`;
-        }
-        if (athlete.actualT2Time) {
-            content += `T2: ${secondsToTime(athlete.actualT2Time)} (${athlete.t2SegmentRank || 'N/A'})<br/>`;
-        }
-        if (athlete.actualRunTime) {
-            content += `Run: ${secondsToTime(athlete.actualRunTime)} (${athlete.runSegmentRank || 'N/A'})<br/>`;
-        } else if ((athlete.status === 'DNF' || athlete.status === 'LAP') && athlete.actualBikeTime) {
-            content += `Run: DNF<br/>`;
-        }
-        
-        content += `<hr style="margin: 5px 0; border: 0; border-top: 1px solid rgba(255,255,255,0.3);">`;
-        
-        if (athlete.status && !['OK', ''].includes(athlete.status)) {
-            content += `Status: ${athlete.status}`;
-        } else {
-            const finishTime = athlete.actualTotalTime || 0;
-            const timeBehind = athlete.runGap || 0;
-            content += `Total: ${secondsToTime(finishTime)} ${timeBehind === 0 ? '(Leader)' : '(+' + secondsToTime(timeBehind) + ')'}`;
-        }
-        
-        return content;
-    }
-    
     stagePoint(athlete, stage, cumTime, timeBehindLeader) {
         const name = athlete.baseName || athlete.name.replace(/ \([^)]*\)$/, '');
         let content = `<strong>${name} (${athlete.country})</strong><br/>`;

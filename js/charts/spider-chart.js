@@ -1,8 +1,8 @@
 import { BaseChart } from './base-chart.js';
-import { ChartConfig } from '../config/chart-config.js';
 import { RaceConfig } from '../config/race-config.js';
 import { responsiveManager } from '../utils/responsive.js';
 import { secondsToTime } from '../utils/formatters.js';
+import { tooltipManager } from '../ui/tooltips.js';
 
 export class SpiderChart extends BaseChart {
     constructor(containerId) {
@@ -232,7 +232,6 @@ export class SpiderChart extends BaseChart {
             const isVisible = this.athleteVisibility[athlete.name] === true;
             const strokeDasharray = this.getStrokeDasharray(athlete.status);
             
-            // Create path data, using 0 for incomplete values
             const pathData = athleteData.map(d => d.incomplete ? { value: 0 } : d);
             
             // Draw area
@@ -245,13 +244,17 @@ export class SpiderChart extends BaseChart {
                 .style("stroke-dasharray", strokeDasharray)
                 .classed("hidden", !isVisible);
             
-            // Add hover events for highlighting only
+            // Add hover events with percentile tooltip
             area.on("mouseover", (event) => {
                 if (!this.athleteVisibility[athlete.name]) return;
                 
                 d3.select(event.target)
                     .style("fill-opacity", 0.4)
                     .style("stroke-width", 3);
+                
+                // Show percentile tooltip
+                const content = this.createPercentileTooltip(athlete, athleteData);
+                tooltipManager.show(content, event.pageX, event.pageY);
             })
             .on("mouseout", (event) => {
                 if (!this.athleteVisibility[athlete.name]) return;
@@ -259,6 +262,33 @@ export class SpiderChart extends BaseChart {
                 d3.select(event.target)
                     .style("fill-opacity", 0.2)
                     .style("stroke-width", 2);
+                
+                tooltipManager.hide();
+            });
+            
+            // Touch events for mobile
+            let touchTimeout;
+            area.on("touchstart", (event) => {
+                event.preventDefault();
+                if (!this.athleteVisibility[athlete.name]) return;
+                
+                d3.select(event.target)
+                    .style("fill-opacity", 0.4)
+                    .style("stroke-width", 3);
+                
+                const touch = event.touches[0];
+                const content = this.createPercentileTooltip(athlete, athleteData);
+                tooltipManager.show(content, touch.pageX, touch.pageY);
+                
+                // Auto-hide after delay
+                touchTimeout = setTimeout(() => {
+                    d3.select(event.target)
+                        .style("fill-opacity", 0.2)
+                        .style("stroke-width", 2);
+                }, 3000);
+            })
+            .on("touchend", () => {
+                if (touchTimeout) clearTimeout(touchTimeout);
             });
             
             // Draw dots at vertices
@@ -279,6 +309,41 @@ export class SpiderChart extends BaseChart {
                 .style("fill", this.colorScale(athlete.name))
                 .classed("hidden", !isVisible);
         });
+    }
+
+    createPercentileTooltip(athlete, athleteData) {
+        const name = athlete.baseName || athlete.name.replace(/ \([^)]*\)$/, '');
+        const totalAthletes = this.data.filter(a => !['DNS', 'DSQ'].includes(a.status)).length;
+        
+        let html = `<div style="font-size: 12px;">`;
+        html += `<div style="font-weight: bold; margin-bottom: 8px; font-size: 13px;">${name} (${athlete.country})</div>`;
+        html += `<div style="margin-bottom: 6px;">Overall: #${athlete.finalRank || 'N/A'}</div>`;
+        html += `<table style="width: 100%; border-collapse: collapse;">`;
+        html += `<tr style="font-size: 10px; opacity: 0.8;">`;
+        html += `<th style="text-align: left; padding: 2px;">Segment</th>`;
+        html += `<th style="text-align: right; padding: 2px;">Rank</th>`;
+        html += `<th style="text-align: right; padding: 2px;">Percentile</th>`;
+        html += `</tr>`;
+        
+        athleteData.forEach(d => {
+            if (d.incomplete) return;
+            
+            const percentile = Math.round((1 - (d.rank - 1) / totalAthletes) * 100);
+            const percentileColor = percentile >= 80 ? '#4ade80' : 
+                                    percentile >= 60 ? '#fbbf24' : 
+                                    percentile >= 40 ? '#fb923c' : '#f87171';
+            
+            html += `<tr>`;
+            html += `<td style="padding: 3px;">${d.axis}</td>`;
+            html += `<td style="text-align: right; padding: 3px;">#${d.rank}</td>`;
+            html += `<td style="text-align: right; padding: 3px; color: ${percentileColor}; font-weight: bold;">Top ${100 - percentile}%</td>`;
+            html += `</tr>`;
+        });
+        
+        html += `</table>`;
+        html += `</div>`;
+        
+        return html;
     }
     
     drawComparisonTable(container) {
@@ -343,7 +408,7 @@ export class SpiderChart extends BaseChart {
             
             row.appendChild(nameCell);
             
-            // Segment times (clickable to show pace)
+            // times (clickable to show pace)
             this.axes.forEach(ax => {
                 const cell = document.createElement('td');
                 cell.style.cssText = 'padding: 8px; border: 1px solid #ddd; text-align: center; position: relative; -webkit-tap-highlight-color: transparent;';

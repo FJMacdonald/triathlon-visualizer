@@ -415,8 +415,7 @@ export class RankChart extends BaseChart {
                         .style("opacity", "0.1");
                 }
             });
-            
-            const content = tooltipManager.athleteSummary(athlete);
+            const content = this.generateRankTooltip(athlete);
             tooltipManager.show(content, window.innerWidth - 250, event.pageY);
         })
         .on("mouseout", () => {
@@ -444,6 +443,94 @@ export class RankChart extends BaseChart {
             
             tooltipManager.hide();
         });
+    }
+    // Add new method for rank chart tooltip
+    generateRankTooltip(athlete) {
+        const athleteName = athlete.baseName || athlete.name.replace(/ \([^)]*\)$/, '');
+        
+        let html = `
+            <div style="min-width: 200px;">
+                <div style="font-weight: bold; font-size: 14px; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.3); padding-bottom: 4px;">
+                    ${athleteName} (${athlete.country})
+                </div> 
+                <table style="width: 100%; font-size: 12px; border-collapse: collapse;">
+                    <thead>
+                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.2);">
+                            <th style="text-align: left; padding: 4px 8px 4px 0;">Stage</th>
+                            <th style="text-align: right; padding: 4px 0;">Time</th>
+                            <th style="text-align: right; padding: 4px 0 4px 8px;">Position</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+        
+        // Swim
+        if (athlete.actualSwimTime) {
+            html += `
+                <tr>
+                    <td style="padding: 3px 8px 3px 0;">🏊 Swim</td>
+                    <td style="text-align: right; padding: 3px 0; font-family: monospace;">${secondsToTime(athlete.actualSwimTime)}</td>
+                    <td style="text-align: right; padding: 3px 0 3px 8px;">${athlete.swimRank || '-'}</td>
+                </tr>
+            `;
+        }
+        
+        // T1
+        if (athlete.actualT1Time) {
+            html += `
+                <tr>
+                    <td style="padding: 3px 8px 3px 0;">🔄 T1</td>
+                    <td style="text-align: right; padding: 3px 0; font-family: monospace;">${secondsToTime(athlete.actualT1Time)}</td>
+                    <td style="text-align: right; padding: 3px 0 3px 8px;">${athlete.t1Rank || '-'}</td>
+                </tr>
+            `;
+        }
+        
+        // Bike
+        if (athlete.actualBikeTime) {
+            html += `
+                <tr>
+                    <td style="padding: 3px 8px 3px 0;">🚴 Bike</td>
+                    <td style="text-align: right; padding: 3px 0; font-family: monospace;">${secondsToTime(athlete.actualBikeTime)}</td>
+                    <td style="text-align: right; padding: 3px 0 3px 8px;">${athlete.bikeRank || '-'}</td>
+                </tr>
+            `;
+        }
+        
+        // T2
+        if (athlete.actualT2Time) {
+            html += `
+                <tr>
+                    <td style="padding: 3px 8px 3px 0;">🔄 T2</td>
+                    <td style="text-align: right; padding: 3px 0; font-family: monospace;">${secondsToTime(athlete.actualT2Time)}</td>
+                    <td style="text-align: right; padding: 3px 0 3px 8px;">${athlete.t2Rank || '-'}</td>
+                </tr>
+            `;
+        }
+        
+        // Run
+        if (athlete.actualRunTime) {
+            html += `
+                <tr>
+                    <td style="padding: 3px 8px 3px 0;">🏃 Run</td>
+                    <td style="text-align: right; padding: 3px 0; font-family: monospace;">${secondsToTime(athlete.actualRunTime)}</td>
+                    <td style="text-align: right; padding: 3px 0 3px 8px;">${athlete.finalRank || '-'}</td>
+                </tr>
+            `;
+        }
+        
+        html += `
+                    </tbody>
+                </table>
+            </div>
+        `;
+        
+        // Only show status if it's not finished
+        if (athlete.status && !['Finished', ''].includes(athlete.status)) {
+            html += `<div style="margin-top: 8px; padding: 4px 8px; background: rgba(220, 53, 69, 0.3); border-radius: 3px; font-size: 11px; text-align: center;">Status: ${athlete.status}</div>`;
+        }
+        
+        return html;
     }
     
     drawLabels(g, yScale, width, nonDsqData, dsqAthletes) {

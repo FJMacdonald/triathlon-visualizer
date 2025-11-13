@@ -3,6 +3,7 @@ import { ChartConfig } from '../config/chart-config.js';
 import { tooltipManager } from '../ui/tooltips.js';
 import { secondsToTime } from '../utils/formatters.js';
 import { responsiveManager } from '../utils/responsive.js';
+import { RaceConfig } from '../config/race-config.js';
 
 export class DevelopmentChart extends BaseChart {
     constructor(containerId) {
@@ -683,6 +684,51 @@ export class DevelopmentChart extends BaseChart {
     }
     
     addPathHoverEvents(hitArea, athlete) {
+        const isMobile = responsiveManager.isMobile || window.innerWidth <= 768;
+        
+        // Long press handler for hypothetical analysis
+        let longPressTimer;
+        let touchStartTime = 0;
+        let hasMoved = false;
+        
+        hitArea.on("touchstart", (event) => {
+            event.preventDefault();
+            touchStartTime = Date.now();
+            hasMoved = false;
+            
+            longPressTimer = setTimeout(() => {
+                if (this.onAthleteClick && !hasMoved) {
+                    this.onAthleteClick(athlete.athlete, 'Finish');
+                    if (navigator.vibrate) navigator.vibrate(50);
+                }
+            }, 600);
+        })
+        .on("touchmove", () => {
+            hasMoved = true;
+            if (longPressTimer) clearTimeout(longPressTimer);
+        })
+        .on("touchend touchcancel", (event) => {
+            if (longPressTimer) clearTimeout(longPressTimer);
+            
+            const touchDuration = Date.now() - touchStartTime;
+            if (touchDuration < 300 && !hasMoved) {
+                event.preventDefault();
+                this.showLineTooltip(event, athlete);
+            }
+        });
+        
+        // Desktop events
+        hitArea.on("mousedown", () => {
+            longPressTimer = setTimeout(() => {
+                if (this.onAthleteClick) {
+                    this.onAthleteClick(athlete.athlete, 'Finish');
+                }
+            }, 500);
+        })
+        .on("mouseup", () => {
+            if (longPressTimer) clearTimeout(longPressTimer);
+        });
+        
         hitArea.on("mouseover", (event) => {
             d3.selectAll(`.athlete-path-${athlete.athleteIndex}`)
                 .style("stroke-width", "3px")
@@ -691,18 +737,7 @@ export class DevelopmentChart extends BaseChart {
                 .attr("r", 5)
                 .attr("opacity", 1);
             
-            const athleteName = athlete.athlete.baseName || athlete.name.replace(/ \([^)]*\)$/, '');
-            const finishTime = athlete.athlete.actualTotalTime || 0;
-            const lastPoint = athlete.values[athlete.values.length - 1];
-            const timeDiff = lastPoint.timeBehind;
-            
-            const content = `
-                <strong>${athleteName} (${athlete.athlete.finalRank || 'N/A'}) ${athlete.athlete.country}</strong><br/>
-                Finish Time: ${secondsToTime(finishTime)}<br/>
-                ${timeDiff > 0 ? `Behind Leader: ${secondsToTime(timeDiff)}` : 'Race Winner'}
-            `;
-            
-            tooltipManager.show(content, window.innerWidth - 250, event.pageY);
+            this.showLineTooltip(event, athlete);
         })
         .on("mouseout", () => {
             d3.selectAll(`.athlete-path-${athlete.athleteIndex}`)
@@ -715,8 +750,86 @@ export class DevelopmentChart extends BaseChart {
             tooltipManager.hide();
         });
     }
-    
+
+    showLineTooltip(event, athlete) {
+        const content = this.createLineTooltipContent(athlete.athlete);
+        const x = event.pageX || (event.touches && event.touches[0] ? event.touches[0].pageX : 0);
+        const y = event.pageY || (event.touches && event.touches[0] ? event.touches[0].pageY : 0);
+        
+        tooltipManager.show(content, x, y);
+    }
+
+    createLineTooltipContent(athlete) {
+        const name = athlete.baseName || athlete.name.replace(/ \([^)]*\)$/, '');
+        
+        let html = `<table style="width: 100%; border-collapse: collapse; font-size: 11px;">`;
+        html += `<thead><tr style="background: rgba(255,255,255,0.1);">`;
+        html += `<th colspan="3" style="padding: 6px; text-align: left; font-size: 13px;">`;
+        html += `${name} - #${athlete.finalRank || 'N/A'} - ${secondsToTime(athlete.actualTotalTime || 0)}`;
+        html += `</th></tr>`;
+        html += `<tr style="font-size: 10px; opacity: 0.8;">`;
+        html += `<th style="padding: 3px;">Segment</th>`;
+        html += `<th style="padding: 3px; text-align: right;">Time</th>`;
+        html += `<th style="padding: 3px; text-align: right;">Rank (Pace)</th>`;
+        html += `</tr></thead><tbody>`;
+        
+        // Swim
+        if (athlete.actualSwimTime) {
+            const swimPace = RaceConfig.getSwimPace(athlete.actualSwimTime);
+            html += `<tr>`;
+            html += `<td style="padding: 4px;">Swim</td>`;
+            html += `<td style="padding: 4px; text-align: right;">${secondsToTime(athlete.actualSwimTime)}</td>`;
+            html += `<td style="padding: 4px; text-align: right;">#${athlete.swimRank || 'N/A'} (${secondsToTime(swimPace)}/100m)</td>`;
+            html += `</tr>`;
+        }
+        
+        // T1
+        if (athlete.actualT1Time) {
+            html += `<tr>`;
+            html += `<td style="padding: 4px;">T1</td>`;
+            html += `<td style="padding: 4px; text-align: right;">${secondsToTime(athlete.actualT1Time)}</td>`;
+            html += `<td style="padding: 4px; text-align: right;">#${athlete.t1Rank || 'N/A'}</td>`;
+            html += `</tr>`;
+        }
+        
+        // Bike
+        if (athlete.actualBikeTime) {
+            const bikeSpeed = RaceConfig.getBikeSpeed(athlete.actualBikeTime);
+            html += `<tr>`;
+            html += `<td style="padding: 4px;">Bike</td>`;
+            html += `<td style="padding: 4px; text-align: right;">${secondsToTime(athlete.actualBikeTime)}</td>`;
+            html += `<td style="padding: 4px; text-align: right;">#${athlete.bikeRank || 'N/A'} (${bikeSpeed.toFixed(1)} km/h)</td>`;
+            html += `</tr>`;
+        }
+        
+        // T2
+        if (athlete.actualT2Time) {
+            html += `<tr>`;
+            html += `<td style="padding: 4px;">T2</td>`;
+            html += `<td style="padding: 4px; text-align: right;">${secondsToTime(athlete.actualT2Time)}</td>`;
+            html += `<td style="padding: 4px; text-align: right;">#${athlete.t2Rank || 'N/A'}</td>`;
+            html += `</tr>`;
+        }
+        
+        // Run
+        if (athlete.actualRunTime) {
+            const runPace = RaceConfig.getRunPace(athlete.actualRunTime);
+            const paceStr = `${Math.floor(runPace)}:${Math.round((runPace % 1) * 60).toString().padStart(2, '0')}`;
+            html += `<tr>`;
+            html += `<td style="padding: 4px;">Run</td>`;
+            html += `<td style="padding: 4px; text-align: right;">${secondsToTime(athlete.actualRunTime)}</td>`;
+            html += `<td style="padding: 4px; text-align: right;">#${athlete.runRank || 'N/A'} (${paceStr}/km)</td>`;
+            html += `</tr>`;
+        }
+        
+        html += `</tbody></table>`;
+        
+        return html;
+    }
+        
     drawStageCircles(chartContent, athlete, isVisible) {
+        const isMobile = responsiveManager.isMobile || window.innerWidth <= 768;
+        
         athlete.values.forEach((point) => {
             const circle = chartContent.append("circle")
                 .attr("class", `athlete-circle athlete-circle-${athlete.athleteIndex}`)
@@ -725,14 +838,17 @@ export class DevelopmentChart extends BaseChart {
                 .attr("data-stage", point.stage)
                 .attr("cx", this.xScale(point.distance))
                 .attr("cy", this.yScale(point.timeBehind))
-                .attr("r", 4)
+                .attr("r", isMobile ? 6 : 4) // Larger touch target on mobile
                 .attr("fill", this.colorScale(athlete.name))
                 .style("cursor", "pointer")
                 .classed("hidden", !isVisible);
             
             // Long-press for hypothetical analysis
             let longPressTimer;
+            let touchStartTime = 0;
+            let hasMoved = false;
             
+            // Mouse events (desktop)
             circle.on("mousedown", () => {
                 longPressTimer = setTimeout(() => {
                     if (this.onAthleteClick) {
@@ -742,21 +858,53 @@ export class DevelopmentChart extends BaseChart {
             })
             .on("mouseup mouseleave", () => {
                 if (longPressTimer) clearTimeout(longPressTimer);
+            });
+            
+            // Touch events (mobile)
+            circle.on("touchstart", (event) => {
+                event.preventDefault(); // Prevent scroll
+                touchStartTime = Date.now();
+                hasMoved = false;
+                
+                longPressTimer = setTimeout(() => {
+                    if (this.onAthleteClick && !hasMoved) {
+                        this.onAthleteClick(athlete.athlete, point.stage);
+                        // Provide haptic feedback if available
+                        if (navigator.vibrate) {
+                            navigator.vibrate(50);
+                        }
+                    }
+                }, 600); // Slightly longer for touch
             })
-            .on("mouseover", (event) => {
+            .on("touchmove", () => {
+                hasMoved = true;
+                if (longPressTimer) clearTimeout(longPressTimer);
+            })
+            .on("touchend touchcancel", (event) => {
+                if (longPressTimer) clearTimeout(longPressTimer);
+                
+                // Show tooltip on short tap
+                const touchDuration = Date.now() - touchStartTime;
+                if (touchDuration < 300 && !hasMoved) {
+                    event.preventDefault();
+                    this.showCircleTooltip(event, athlete, point);
+                }
+            });
+            
+            // Desktop hover events
+            circle.on("mouseover", (event) => {
+                if (isMobile) return; // Skip on mobile
+                
                 d3.selectAll(`.athlete-path-${athlete.athleteIndex}`)
                     .attr("stroke-width", 3)
                     .attr("opacity", 1);
                 d3.select(event.target).attr("r", 6);
                 
-                const leaderTimeAtStage = this.getLeaderTimeAtStage(point.stage);
-                const timeBehindLeader = point.cumTime - leaderTimeAtStage;
-                const content = tooltipManager.stagePoint(athlete.athlete, point.stage, point.cumTime, timeBehindLeader);
-                
-                const isNearRightEdge = point.stage === 'Finish' || this.xScale(point.distance) > this.dimensions.width * 0.8;
-                tooltipManager.show(content, event.pageX, event.pageY, { preferLeft: isNearRightEdge });
+                this.showCircleTooltip(event, athlete, point);
             })
             .on("mouseout", (event) => {
+                if (isMobile) return;
+                
                 d3.selectAll(`.athlete-path-${athlete.athleteIndex}`)
                     .attr("stroke-width", 1.5)
                     .attr("opacity", 0.4);
@@ -765,7 +913,64 @@ export class DevelopmentChart extends BaseChart {
             });
         });
     }
-    
+
+    showCircleTooltip(event, athlete, point) {
+        const leaderTimeAtStage = this.getLeaderTimeAtStage(point.stage);
+        const timeBehindLeader = point.cumTime - leaderTimeAtStage;
+        const content = this.createCircleTooltipContent(athlete.athlete, point.stage, timeBehindLeader);
+        
+        const isNearRightEdge = point.stage === 'Finish' || this.xScale(point.distance) > this.dimensions.width * 0.8;
+        
+        // Get position from event
+        const x = event.pageX || (event.touches && event.touches[0] ? event.touches[0].pageX : 0);
+        const y = event.pageY || (event.touches && event.touches[0] ? event.touches[0].pageY : 0);
+        
+        tooltipManager.show(content, x, y, { preferLeft: isNearRightEdge });
+    }
+
+    createCircleTooltipContent(athlete, highlightStage, timeBehindLeaderAtStage) {
+        const name = athlete.baseName || athlete.name.replace(/ \([^)]*\)$/, '');
+        
+        let html = `<table style="width: 100%; border-collapse: collapse; font-size: 11px;">`;
+        html += `<thead><tr style="background: rgba(255,255,255,0.1);">`;
+        html += `<th colspan="3" style="padding: 6px; text-align: left; font-size: 13px;">`;
+        html += `${name} - #${athlete.finalRank || 'N/A'} - ${secondsToTime(athlete.actualTotalTime || 0)}`;
+        html += `</th></tr></thead><tbody>`;
+        
+        const stages = [
+            { name: 'Swim', time: athlete.actualSwimTime, behind: athlete.swimCumulative - this.stageLeaderTimes.swim },
+            { name: 'T1', time: athlete.actualT1Time, behind: athlete.t1Cumulative - this.stageLeaderTimes.t1 },
+            { name: 'Bike', time: athlete.actualBikeTime, behind: athlete.bikeCumulative - this.stageLeaderTimes.bike },
+            { name: 'T2', time: athlete.actualT2Time, behind: athlete.t2Cumulative - this.stageLeaderTimes.t2 },
+            { name: 'Run', time: athlete.actualRunTime, behind: athlete.totalCumulative - this.stageLeaderTimes.finish }
+        ];
+        
+        stages.forEach(stage => {
+            if (!stage.time) return;
+            
+            const isHighlighted = stage.name === highlightStage || 
+                                (highlightStage === 'Finish' && stage.name === 'Run');
+            const bgColor = isHighlighted ? 'rgba(255,255,0,0.3)' : 'transparent';
+            const fontWeight = isHighlighted ? 'bold' : 'normal';
+            
+            const behindText = stage.behind <= 0 ? 'Leader' : `+${secondsToTime(stage.behind)}`;
+            
+            html += `<tr style="background: ${bgColor};">`;
+            html += `<td style="padding: 4px; font-weight: ${fontWeight};">${stage.name}</td>`;
+            html += `<td style="padding: 4px; text-align: right;">${secondsToTime(stage.time)}</td>`;
+            html += `<td style="padding: 4px; text-align: right; color: ${stage.behind <= 0 ? '#4ade80' : '#fbbf24'};">${behindText}</td>`;
+            html += `</tr>`;
+        });
+        
+        html += `</tbody></table>`;
+        
+        const isMobile = responsiveManager.isMobile || window.innerWidth <= 768;
+        if (!isMobile) {
+            html += `<div style="margin-top: 8px; font-size: 10px; opacity: 0.7; text-align: center;">Long press for hypothetical analysis</div>`;
+        }
+        
+        return html;
+    }    
     getLeaderTimeAtStage(stage) {
         switch(stage) {
             case 'Swim': return this.stageLeaderTimes.swim;
@@ -1069,11 +1274,6 @@ export class DevelopmentChart extends BaseChart {
             }
         }
     }
-
-
-
-
-
 
 
 
