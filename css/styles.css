@@ -690,48 +690,6 @@ input[type="file"] {
     margin-top: var(--spacing-xl);
 }
 
-/* ========================================
-   Zoom Features
-   ======================================== */
-.zoom-overlay {
-    cursor: crosshair;
-}
-
-.zoom-overlay.active {
-    fill: rgba(100, 150, 255, 0.05);
-}
-
-.zoom-selection {
-    fill: rgba(100, 100, 200, 0.2);
-    stroke: rgba(100, 100, 200, 0.8);
-    stroke-width: 1;
-    stroke-dasharray: 3,3;
-}
-
-.zoom-hint {
-    position: fixed;
-    bottom: var(--spacing-lg);
-    right: var(--spacing-lg);
-    background: rgba(102, 126, 234, 0.95);
-    color: white;
-    padding: var(--spacing-md) var(--spacing-lg);
-    border-radius: var(--border-radius);
-    font-size: var(--font-size-sm);
-    font-weight: var(--font-weight-medium);
-    box-shadow: 0 4px 6px rgba(0,0,0,0.2);
-    z-index: 2000;
-    display: none;
-    animation: fadeIn var(--transition-normal);
-}
-
-.zoom-hint.active {
-    display: block;
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-}
 
 /* ========================================
    Dialogs
