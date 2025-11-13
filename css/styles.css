@@ -1,5 +1,5 @@
 /* ========================================
-   CSS Variables & Base Styles
+   CSS Variables
    ======================================== */
 :root {
     /* Typography */
@@ -50,6 +50,9 @@
     --transition-normal: 0.3s ease;
 }
 
+/* ========================================
+   Base Reset & Typography
+   ======================================== */
 * {
     margin: 0;
     padding: 0;
@@ -66,7 +69,7 @@ body {
 }
 
 /* ========================================
-   Layout Components
+   Layout
    ======================================== */
 .container {
     max-width: var(--container-max-width);
@@ -90,20 +93,26 @@ h1 {
     font-weight: var(--font-weight-semibold);
 }
 
+.page-content {
+    padding: var(--spacing-lg);
+    background: white;
+    border-radius: var(--border-radius);
+}
+
 /* ========================================
    Upload Section
    ======================================== */
 .upload-section {
     background: linear-gradient(135deg, var(--primary-color) 0%, #764ba2 100%);
     border-radius: var(--border-radius);
-    padding: var(--spacing-lg);  /* Reduced from xl */
+    padding: var(--spacing-lg);
     text-align: center;
-    margin-bottom: var(--spacing-lg);  /* Reduced from xl */
+    margin-bottom: var(--spacing-lg);
     transition: all var(--transition-normal);
 }
 
 .upload-section.has-data {
-    padding: var(--spacing-sm);  /* Much smaller when file is loaded */
+    padding: var(--spacing-sm);
     background: var(--background-light);
     margin-bottom: var(--spacing-md);
 }
@@ -112,12 +121,18 @@ h1 {
     position: relative;
     display: inline-block;
     cursor: pointer;
-    margin-bottom: 0;  /* Remove bottom margin */
+    margin-bottom: 0;
+}
+
+.upload-section.has-data .file-input-wrapper {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-sm);
 }
 
 .file-input-label {
     display: inline-block;
-    padding: 0.5rem 1.5rem;  /* Smaller padding */
+    padding: 0.5rem 1.5rem;
     background: white;
     color: var(--primary-color);
     border-radius: 3.125rem;
@@ -128,32 +143,6 @@ h1 {
     box-shadow: 0 0.25rem 0.9375rem rgba(0,0,0,0.1);
 }
 
-.file-input-label.has-file {
-    background: var(--success-color);
-    color: white;
-    padding: 0.4rem 1rem;  /* Even smaller when file selected */
-    font-size: var(--font-size-xs);
-}
-
-.file-name {
-    color: white;
-    margin-top: 0;
-    margin-left: var(--spacing-sm);
-    font-size: var(--font-size-xs);
-    display: inline-block;  /* Make it inline */
-}
-
-.has-data .file-name {
-    color: var(--label-color);
-}
-
-/* Make upload section flex when file is loaded */
-.upload-section.has-data .file-input-wrapper {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-}
-
 .file-input-label:hover {
     transform: translateY(-2px);
     box-shadow: 0 6px 20px rgba(0,0,0,0.15);
@@ -162,6 +151,20 @@ h1 {
 .file-input-label.has-file {
     background: var(--success-color);
     color: white;
+    padding: 0.4rem 1rem;
+    font-size: var(--font-size-xs);
+}
+
+.file-name {
+    color: white;
+    margin-top: 0;
+    margin-left: var(--spacing-sm);
+    font-size: var(--font-size-xs);
+    display: inline-block;
+}
+
+.has-data .file-name {
+    color: var(--label-color);
 }
 
 input[type="file"] {
@@ -238,48 +241,17 @@ input[type="file"] {
     background: var(--primary-color);
     color: white;
 }
-/* ========================================
-   Settings Page
-   ======================================== */
-   #settingsSection input[type="range"] {
-    -webkit-appearance: none;
-    appearance: none;
-    height: 6px;
-    background: #ddd;
-    border-radius: 3px;
-    outline: none;
+
+.tab-btn[data-tab="teams"] {
+    position: relative;
 }
 
-#settingsSection input[type="range"]::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 18px;
-    height: 18px;
-    background: var(--primary-color);
-    border-radius: 50%;
-    cursor: pointer;
-    transition: all 0.2s;
-    padding: 20px;
-}
-
-#settingsSection input[type="range"]::-webkit-slider-thumb:hover {
-    background: var(--primary-dark);
-    transform: scale(1.2);
-}
-
-#settingsSection input[type="range"]::-moz-range-thumb {
-    width: 18px;
-    height: 18px;
-    background: var(--primary-color);
-    border-radius: 50%;
-    cursor: pointer;
-    border: none;
-    transition: all 0.2s;
-}
-
-#settingsSection input[type="range"]::-moz-range-thumb:hover {
-    background: var(--primary-dark);
-    transform: scale(1.2);
+.tab-btn[data-tab="teams"].ncaa::after {
+    content: "🏆";
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    font-size: 12px;
 }
 
 /* ========================================
@@ -294,8 +266,8 @@ input[type="file"] {
 }
 
 .chart-container {
-    margin: var(--spacing-xl) 0;
-    padding: var(--spacing-lg);
+    margin: var(--spacing-md) 0;
+    padding: var(--spacing-md);
     background: var(--background-light);
     border-radius: var(--border-radius);
     display: none;
@@ -307,14 +279,22 @@ input[type="file"] {
     display: block;
 }
 
-
-
-/* Chart SVG responsive */
 .chart-container svg {
     display: block;
     margin: 0 auto;
     max-width: 100%;
     height: auto;
+}
+
+.chart-title {
+    font-size: var(--font-size-lg);
+    color: var(--axis-color);
+    padding: var(--spacing-lg);
+    text-align: center;
+    font-weight: var(--font-weight-semibold);
+    background: white;
+    border-bottom: 2px solid var(--grid-color);
+    margin: 0;
 }
 
 /* ========================================
@@ -438,7 +418,7 @@ input[type="file"] {
 }
 
 /* ========================================
-   Legend & Athlete Lists
+   Legend & Athlete/Country Lists
    ======================================== */
 .legend-container {
     margin: var(--spacing-lg) 0;
@@ -455,17 +435,6 @@ input[type="file"] {
     border: 1px solid var(--grid-color);
     border-radius: var(--border-radius);
     padding: var(--spacing-sm);
-}
-
-.country-list {
-    max-height: 8rem;
-    overflow-y: auto;
-    border: 1px solid var(--grid-color);
-    border-radius: var(--border-radius);
-    padding: var(--spacing-sm);
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: var(--spacing-xs);
 }
 
 .athlete-item {
@@ -493,6 +462,17 @@ input[type="file"] {
     background: #e8f5e8;
 }
 
+.country-list {
+    max-height: 8rem;
+    overflow-y: auto;
+    border: 1px solid var(--grid-color);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-sm);
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--spacing-xs);
+}
+
 .country-item {
     display: inline-flex;
     align-items: center;
@@ -505,12 +485,6 @@ input[type="file"] {
     opacity: var(--chart-opacity-visible);
 }
 
-.country-item.selected {
-    opacity: 1 !important;
-    font-weight: var(--font-weight-semibold);
-    box-shadow: 0 0 0 2px currentColor;
-}
-
 .country-item:hover {
     background: #f0f0f0;
 }
@@ -520,13 +494,19 @@ input[type="file"] {
     background: var(--background-light);
 }
 
+.country-item.selected {
+    opacity: 1 !important;
+    font-weight: var(--font-weight-semibold);
+    box-shadow: 0 0 0 2px currentColor;
+}
+
 .country-flag {
     margin-right: 1px;
     font-size: var(--font-size-md);
 }
 
 /* ========================================
-   Chart Elements
+   Chart Elements (SVG)
    ======================================== */
 .axis text {
     font-family: var(--font-family);
@@ -551,6 +531,7 @@ input[type="file"] {
     stroke-width: 0;
 }
 
+/* Athlete paths */
 .athlete-path {
     fill: none;
     stroke-width: var(--chart-line-width);
@@ -600,6 +581,7 @@ input[type="file"] {
     display: none;
 }
 
+/* Radar chart */
 .radar-area {
     fill-opacity: 0.2;
     stroke-width: 2;
@@ -652,9 +634,9 @@ input[type="file"] {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: var(--spacing-lg);
-    margin: var(--spacing-lg) 0;
+    margin-bottom: var(--spacing-xl);
     padding: var(--spacing-lg);
-    background: white;
+    background: var(--background-light);
     border-radius: var(--border-radius);
 }
 
@@ -679,11 +661,16 @@ input[type="file"] {
     grid-template-columns: repeat(auto-fit, minmax(12.5rem, 1fr));
     gap: var(--spacing-lg);
     padding: var(--spacing-lg);
-    background: white;
+    background: var(--background-light);
     border-radius: var(--border-radius);
-    margin-top: var(--spacing-xl);
+    margin-bottom: var(--spacing-xl);
 }
 
+.top-performances {
+    padding: var(--spacing-lg);
+    background: var(--background-light);
+    border-radius: var(--border-radius);
+}
 
 /* ========================================
    Dialogs
@@ -750,355 +737,9 @@ input[type="file"] {
     margin-right: var(--spacing-sm);
 }
 
-
-
-/* Larger chart containers */
-.chart-container {
-    margin: var(--spacing-md) 0;
-    padding: var(--spacing-md);
-    background: var(--background-light);
-    border-radius: var(--border-radius);
-    width: 100%;
-    overflow: hidden;
-}
-
-.chart-title {
-    font-size: var(--font-size-lg);
-    color: var(--axis-color);
-    margin-bottom: var(--spacing-md);
-    text-align: center;
-    font-weight: var(--font-weight-semibold);
-}
-
-/* Team performances tab */
-.team-section {
-    background: white;
-    border-radius: var(--border-radius);
-    padding: var(--spacing-lg);
-    margin-bottom: var(--spacing-lg);
-}
-
-.team-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: var(--spacing-md);
-    background: var(--background-light);
-    border-radius: var(--border-radius);
-    margin-bottom: var(--spacing-md);
-}
-
-.team-name {
-    font-size: var(--font-size-lg);
-    font-weight: var(--font-weight-semibold);
-    color: var(--primary-color);
-}
-
-.team-score {
-    font-size: var(--font-size-lg);
-    font-weight: var(--font-weight-semibold);
-}
-
-.team-athletes {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-    gap: var(--spacing-md);
-}
-
-.athlete-contribution {
-    background: var(--background-light);
-    padding: var(--spacing-md);
-    border-radius: var(--border-radius);
-    border-left: 4px solid var(--primary-color);
-}
-
-.athlete-name {
-    font-weight: var(--font-weight-semibold);
-    margin-bottom: var(--spacing-xs);
-}
-
-.athlete-details {
-    font-size: var(--font-size-sm);
-    color: var(--label-color);
-}
-
-.pace-info {
-    font-size: var(--font-size-xs);
-    color: var(--label-color);
-    margin-top: var(--spacing-xs);
-}
 /* ========================================
-   Team Logos
+   Settings Page
    ======================================== */
-.team-logo {
-    width: 24px;
-    height: 24px;
-    object-fit: contain;
-    vertical-align: middle;
-    margin-right: 8px;
-    border-radius: 2px;
-}
-
-.athlete-item .team-logo,
-.country-item .team-logo {
-    width: 20px;
-    height: 20px;
-    margin-right: 4px;
-}
-
-/* Make team tab more prominent */
-.tab-btn[data-tab="teams"] {
-    position: relative;
-}
-
-.tab-btn[data-tab="teams"].ncaa::after {
-    content: "🏆";
-    position: absolute;
-    top: -4px;
-    right: -4px;
-    font-size: 12px;
-}
-/* ========================================
-   Responsive Styles
-   ======================================== */
-@media (max-width: 768px) {
-    :root {
-        --sidebar-width: var(--sidebar-width-mobile);
-    }
-    
-    body {
-        padding: var(--spacing-md);
-    }
-    
-    .container {
-        padding: var(--spacing-lg);
-    }
-
-    h1 {
-        font-size: 1.8em;
-    }
-
-    .controls {
-        flex-direction: column;
-    }
-
-    .btn {
-        width: 100%;
-    }
-    
-    .stats-summary {
-        display: none;
-    }
-    
-    .finishers-data {
-        margin-top: var(--spacing-md) !important;
-        padding: var(--spacing-md) !important;
-    }
-    
-    .top-performances {
-        margin-top: var(--spacing-lg) !important;
-    }
-    
-    .main-content.sidebar-open {
-        margin-left: 0;
-    }
-    
-    .sidebar.open ~ .sidebar-toggle {
-        left: calc(var(--sidebar-width-mobile) + var(--spacing-md));
-    }
-    
-    .country-list {
-        grid-template-columns: repeat(2, 1fr);
-    }
-    .tooltip {
-        position: fixed !important;
-        z-index: 10000;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-        border: 1px solid rgba(255,255,255,0.2);
-    }
-    
-    /* Prevent accidental tab clicks while scrolling */
-    .tab-navigation {
-        -webkit-overflow-scrolling: touch;
-        scroll-behavior: smooth;
-        padding: var(--spacing-md) 0;
-        margin: var(--spacing-md) 0;
-        /* Add scroll padding to prevent edge clicks */
-        scroll-padding: 0 var(--spacing-lg);
-    }
-    
-    .tab-btn {
-        /* Increase touch target size */
-        min-height: 44px;
-        padding: var(--spacing-sm) var(--spacing-md);
-        /* Add some breathing room */
-        margin: var(--spacing-xs);
-        /* Prevent text selection while scrolling */
-        -webkit-user-select: none;
-        user-select: none;
-        /* Visual feedback for touch */
-        -webkit-tap-highlight-color: rgba(102, 126, 234, 0.3);
-    }
-    
-    /* Fix Y-axis positioning in portrait */
-    .chart-container {
-        width: 100% !important;
-        overflow-x: auto;
-        overflow-y: hidden;
-        -webkit-overflow-scrolling: touch;
-    }
-    
-    .chart-container svg {
-        display: block;
-        min-width: 100%;
-    }
-    
-    /* Ensure chart wrapper takes full width */
-    .chart-wrapper {
-        width: 100% !important;
-        min-width: 0;
-    }
-    
-    .chart-area {
-        width: 100% !important;
-        min-width: 0;
-    }
-    
-    /* Fix scroll container width */
-    .scroll-container {
-        width: 100% !important;
-    }
-    
-    /* Y-axis label container fixed width */
-    .y-axis-label-container {
-        flex-shrink: 0 !important;
-        width: 20px !important;
-        min-width: 20px !important;
-    }
-}
-/* Portrait-specific fixes */
-@media (max-width: 768px) and (orientation: portrait) {
-    .container {
-        padding: var(--spacing-md);
-    }
-    
-    /* Reduce margins in portrait to maximize chart space */
-    .chart-container {
-        padding: var(--spacing-sm);
-        margin: var(--spacing-sm) 0;
-    }
-    
-    /* Ensure SVG doesn't overflow */
-    #developmentChart,
-    #rankChart,
-    #spiderChart {
-        width: 100%;
-        overflow: visible;
-    }
-    
-    /* Fix tab navigation for portrait scrolling */
-    .tab-navigation {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: var(--spacing-xs);
-        overflow: visible;
-    }
-    
-    .tab-btn {
-        width: 100%;
-        font-size: var(--font-size-xs);
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-}
-
-/* Landscape mobile */
-@media (max-width: 768px) and (orientation: landscape) {
-    .tab-navigation {
-        display: flex;
-        flex-wrap: nowrap;
-        overflow-x: auto;
-        justify-content: flex-start;
-    }
-    
-    .tab-btn {
-        flex-shrink: 0;
-    }
-}
-@media (max-width: 480px) {
-    .tab-navigation {
-        flex-direction: column;
-    }
-    
-    .tab-btn {
-        width: 100%;
-    }
-    
-    .country-list {
-        grid-template-columns: 1fr;
-    }
-}
-/* ========================================
-   Unified Page Content Styling
-   ======================================== */
-.page-content {
-    padding: var(--spacing-lg);
-    background: white;
-    border-radius: var(--border-radius);
-}
-
-.chart-container {
-    margin: var(--spacing-xl) 0;
-    padding: 0; /* Remove padding, let page-content handle it */
-    background: var(--background-light);
-    border-radius: var(--border-radius);
-    display: none;
-    width: 100%;
-    overflow: hidden;
-}
-
-
-
-.chart-title {
-    font-size: var(--font-size-lg);
-    color: var(--axis-color);
-    padding: var(--spacing-lg);
-    text-align: center;
-    font-weight: var(--font-weight-semibold);
-    background: white;
-    border-bottom: 2px solid var(--grid-color);
-    margin: 0;
-}
-
-/* Summary page specific */
-.stats-summary {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: var(--spacing-lg);
-    margin-bottom: var(--spacing-xl);
-    padding: var(--spacing-lg);
-    background: var(--background-light);
-    border-radius: var(--border-radius);
-}
-
-.finishers-data {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(12.5rem, 1fr));
-    gap: var(--spacing-lg);
-    padding: var(--spacing-lg);
-    background: var(--background-light);
-    border-radius: var(--border-radius);
-    margin-bottom: var(--spacing-xl);
-}
-
-.top-performances {
-    padding: var(--spacing-lg);
-    background: var(--background-light);
-    border-radius: var(--border-radius);
-}
-
-/* Settings page specific */
 .settings-group {
     margin-bottom: var(--spacing-xl);
 }
@@ -1107,58 +748,48 @@ input[type="file"] {
     margin-bottom: 0;
 }
 
-/* Teams/Country Rankings shared styles */
-.team-rankings,
-.country-rankings {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-sm);
+#settingsSection input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 6px;
+    background: #ddd;
+    border-radius: 3px;
+    outline: none;
 }
 
-.country-info-box {
-    background: #f0f4ff;
-    border-left: 4px solid var(--primary-color);
-    padding: var(--spacing-lg);
-    border-radius: var(--border-radius);
-    margin-bottom: var(--spacing-lg);
+#settingsSection input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    background: var(--primary-color);
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.2s;
 }
 
-.country-info-box h3 {
-    margin: 0 0 var(--spacing-sm) 0;
-    color: var(--primary-color);
-    font-size: var(--font-size-md);
+#settingsSection input[type="range"]::-webkit-slider-thumb:hover {
+    background: var(--primary-dark);
+    transform: scale(1.2);
 }
 
-.country-info-box p {
-    margin: 0;
-    color: var(--label-color);
-    font-size: var(--font-size-sm);
-}
-.pos.counting {
-    color: white;
-}
-
-.country-rankings .team-row {
-    /* Subtle difference for World Triathlon */
-    background: white;
+#settingsSection input[type="range"]::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    background: var(--primary-color);
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s;
 }
 
-.country-rankings .team-summary:hover {
-    background: rgba(102, 126, 234, 0.05);
+#settingsSection input[type="range"]::-moz-range-thumb:hover {
+    background: var(--primary-dark);
+    transform: scale(1.2);
 }
 
-@media (max-width: 768px) {
-    .page-content {
-        padding: var(--spacing-md);
-    }
-    
-    .stats-summary,
-    .finishers-data {
-        padding: var(--spacing-md);
-    }
-}
 /* ========================================
-   Team/Country Rankings - Complete Styles
+   Team/Country Rankings
    ======================================== */
 .team-rankings,
 .country-rankings {
@@ -1234,17 +865,9 @@ input[type="file"] {
     white-space: nowrap;
 }
 
-.avg.swim { 
-    border-left: 2px solid #0891b2; 
-}
-
-.avg.bike { 
-    border-left: 2px solid #059669; 
-}
-
-.avg.run { 
-    border-left: 2px solid #dc2626; 
-}
+.avg.swim { border-left: 2px solid #0891b2; }
+.avg.bike { border-left: 2px solid #059669; }
+.avg.run { border-left: 2px solid #dc2626; }
 
 .scoring-positions {
     display: flex;
@@ -1394,16 +1017,160 @@ input[type="file"] {
     color: #667eea;
 }
 
-.country-rankings .team-row {
-    background: white;
+.country-info-box {
+    background: #f0f4ff;
+    border-left: 4px solid var(--primary-color);
+    padding: var(--spacing-lg);
+    border-radius: var(--border-radius);
+    margin-bottom: var(--spacing-lg);
+}
+
+.country-info-box h3 {
+    margin: 0 0 var(--spacing-sm) 0;
+    color: var(--primary-color);
+    font-size: var(--font-size-md);
+}
+
+.country-info-box p {
+    margin: 0;
+    color: var(--label-color);
+    font-size: var(--font-size-sm);
 }
 
 .country-rankings .team-summary:hover {
     background: rgba(102, 126, 234, 0.05);
 }
 
-/* Mobile responsiveness for teams */
+/* ========================================
+   Team Logos
+   ======================================== */
+.team-logo {
+    width: 24px;
+    height: 24px;
+    object-fit: contain;
+    vertical-align: middle;
+    margin-right: 8px;
+    border-radius: 2px;
+}
+
+.athlete-item .team-logo,
+.country-item .team-logo {
+    width: 20px;
+    height: 20px;
+    margin-right: 4px;
+}
+
+/* ========================================
+   Responsive - Tablet & Mobile
+   ======================================== */
 @media (max-width: 768px) {
+    :root {
+        --sidebar-width: var(--sidebar-width-mobile);
+    }
+    
+    body {
+        padding: var(--spacing-md);
+    }
+    
+    .container {
+        padding: var(--spacing-lg);
+    }
+
+    h1 {
+        font-size: 1.8em;
+    }
+    
+    .page-content {
+        padding: var(--spacing-md);
+    }
+
+    .controls {
+        flex-direction: column;
+    }
+
+    .btn {
+        width: 100%;
+    }
+    
+    .stats-summary {
+        display: none;
+    }
+    
+    .finishers-data,
+    .stats-summary {
+        padding: var(--spacing-md);
+    }
+    
+    .finishers-data {
+        margin-top: var(--spacing-md) !important;
+    }
+    
+    .top-performances {
+        margin-top: var(--spacing-lg) !important;
+    }
+    
+    .main-content.sidebar-open {
+        margin-left: 0;
+    }
+    
+    .sidebar.open ~ .sidebar-toggle {
+        left: calc(var(--sidebar-width-mobile) + var(--spacing-md));
+    }
+    
+    .country-list {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .tooltip {
+        position: fixed !important;
+        z-index: 10000;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        border: 1px solid rgba(255,255,255,0.2);
+    }
+    
+    .tab-navigation {
+        -webkit-overflow-scrolling: touch;
+        scroll-behavior: smooth;
+        padding: var(--spacing-md) 0;
+        margin: var(--spacing-md) 0;
+        scroll-padding: 0 var(--spacing-lg);
+    }
+    
+    .tab-btn {
+        min-height: 44px;
+        padding: var(--spacing-sm) var(--spacing-md);
+        margin: var(--spacing-xs);
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-tap-highlight-color: rgba(102, 126, 234, 0.3);
+    }
+    
+    .chart-container {
+        width: 100% !important;
+        overflow-x: auto;
+        overflow-y: hidden;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    .chart-container svg {
+        display: block;
+        min-width: 100%;
+    }
+    
+    .chart-wrapper,
+    .chart-area,
+    .scroll-container {
+        width: 100% !important;
+        min-width: 0;
+    }
+    
+    .y-axis-label-container {
+        flex-shrink: 0 !important;
+        width: 20px !important;
+        min-width: 20px !important;
+    }
+    
+    /* Team rankings mobile */
     .team-summary {
         flex-wrap: wrap;
         gap: 8px;
@@ -1442,7 +1209,68 @@ input[type="file"] {
     }
 }
 
+/* Portrait orientation */
+@media (max-width: 768px) and (orientation: portrait) {
+    .container {
+        padding: var(--spacing-md);
+    }
+    
+    .chart-container {
+        padding: var(--spacing-sm);
+        margin: var(--spacing-sm) 0;
+    }
+    
+    #developmentChart,
+    #rankChart,
+    #spiderChart {
+        width: 100%;
+        overflow: visible;
+    }
+    
+    .tab-navigation {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: var(--spacing-xs);
+        overflow: visible;
+    }
+    
+    .tab-btn {
+        width: 100%;
+        font-size: var(--font-size-xs);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+}
+
+/* Landscape orientation */
+@media (max-width: 768px) and (orientation: landscape) {
+    .tab-navigation {
+        display: flex;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        justify-content: flex-start;
+    }
+    
+    .tab-btn {
+        flex-shrink: 0;
+    }
+}
+
+/* Small mobile */
 @media (max-width: 480px) {
+    .tab-navigation {
+        flex-direction: column;
+    }
+    
+    .tab-btn {
+        width: 100%;
+    }
+    
+    .country-list {
+        grid-template-columns: 1fr;
+    }
+    
     .team-rank {
         min-width: 24px;
         font-size: 14px;
