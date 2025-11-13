@@ -1,4 +1,4 @@
-import { secondsToTime, secondsToMinSec, getFlag } from '../utils/formatters.js';
+import { secondsToTime } from '../utils/formatters.js';
 import { RaceConfig } from '../config/race-config.js';
 
 export class TooltipManager {

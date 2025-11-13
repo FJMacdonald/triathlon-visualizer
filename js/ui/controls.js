@@ -1,4 +1,4 @@
-import { secondsToMinSec, getFlag } from '../utils/formatters.js';
+import { secondsToMinSec } from '../utils/formatters.js';
 import { RaceConfig } from '../config/race-config.js';
 
 export class SummaryDisplay {

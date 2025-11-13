@@ -8,7 +8,7 @@ import { sidebarManager } from './ui/sidebar.js';
 import { summaryDisplay } from './ui/controls.js';
 import { hypotheticalAnalysis } from './hypothetical.js';
 import { responsiveManager } from './utils/responsive.js';
-import { secondsToTime, secondsToMinSec } from './utils/formatters.js';
+import { secondsToTime, secondsToMinSec, getFlag } from './utils/formatters.js';
 
 class TriathlonVisualizer {
     constructor() {
@@ -607,7 +607,7 @@ class TriathlonVisualizer {
         const podiumColors = ['#FFD700', '#C0C0C0', '#CD7F32'];
         
         teamScores.forEach((team, index) => {
-            const flag = this.getFlag(team.country);
+            const flag = getFlag(team.country);
             const medal = index < 3 ? medals[index] : `${index + 1}.`;
             const borderColor = index < 3 ? podiumColors[index] : '#ddd';
             const teamColor = getTeamColor(team.country);
@@ -902,17 +902,6 @@ class TriathlonVisualizer {
 
 
 
-    getFlag(countryCode) {
-        const flags = {
-            'AUS': '🇦🇺', 'ITA': '🇮🇹', 'HUN': '🇭🇺', 'JPN': '🇯🇵', 'ESP': '🇪🇸',
-            'CZE': '🇨🇿', 'CHI': '🇨🇱', 'CHL': '🇨🇱', 'FRA': '🇫🇷', 'CAN': '🇨🇦', 
-            'SUI': '🇨🇭', 'NED': '🇳🇱', 'GER': '🇩🇪', 'BEL': '🇧🇪', 'GBR': '🇬🇧', 
-            'USA': '🇺🇸', 'NZL': '🇳🇿', 'AUT': '🇦🇹', 'POR': '🇵🇹', 'BRA': '🇧🇷', 
-            'MEX': '🇲🇽', 'ARG': '🇦🇷', 'RSA': '🇿🇦', 'NOR': '🇳🇴', 'SWE': '🇸🇪', 
-            'DEN': '🇩🇰'
-        };
-        return flags[countryCode] || '🏴';
-    }
 }
 
 // Initialize application when DOM is ready
