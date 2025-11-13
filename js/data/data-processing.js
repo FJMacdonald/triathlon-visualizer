@@ -5,6 +5,8 @@ export class DataProcessor {
         this.rawData = null;
         this.processedData = null;
         this.segmentLeaders = {};
+        this.raceType = null; // 'ncaa' or 'worldtriathlon'
+        this.raceDistance = null; // 'sprint' or 'olympic'
     }
     
     parseCSV(text) {
@@ -23,7 +25,36 @@ export class DataProcessor {
         }
         
         this.rawData = data;
+        this.detectRaceType(data);
         return data;
+    }
+    
+    detectRaceType(data) {
+        // Check if this is NCAA or World Triathlon based on country codes
+        const ncaaTeams = ['UoA', 'QU', 'UD', 'ASU', 'TCU', 'ETSU', 'USD', 'USF', 
+                          'Duquesne', 'Navy', 'DSU', 'LaSalle', 'Wagner', 'NKU', 'CSU'];
+        
+        if (data.length > 0) {
+            const firstCountry = data[0].Country;
+            this.raceType = ncaaTeams.includes(firstCountry) ? 'ncaa' : 'worldtriathlon';
+        }
+    }
+    
+    detectRaceDistance(data) {
+        // Use first 3 finishers to estimate race distance
+        const finishers = data
+            .filter(a => a.actualTotalTime && !['DNS', 'DNF', 'DSQ'].includes(a.status))
+            .slice(0, 3);
+        
+        if (finishers.length === 0) return 'olympic';
+        
+        const avgTotal = finishers.reduce((sum, a) => sum + a.actualTotalTime, 0) / finishers.length;
+        
+        // Sprint races typically finish in 55-65 minutes for top athletes
+        // Olympic races typically finish in 1:50-2:00 for top athletes
+        this.raceDistance = avgTotal < 4200 ? 'sprint' : 'olympic'; // 70 minutes as threshold
+        
+        return this.raceDistance;
     }
     
     processRaceData(data) {
@@ -82,6 +113,9 @@ export class DataProcessor {
         // Sort by total time
         processed.sort((a, b) => a.totalCumulative - b.totalCumulative);
         
+        // Detect race distance and apply config
+        const distance = this.detectRaceDistance(processed);
+        
         // Assign final ranks
         this.assignRanks(processed);
         
@@ -113,7 +147,7 @@ export class DataProcessor {
         const finishers = processed.filter(a => !['DNF', 'DSQ', 'LAP', 'DNS'].includes(a.status));
         
         processed.forEach((athlete) => {
-            // Race position ranks (cumulative) - FIXED: Check that comparison athletes have actual times
+            // Race position ranks (cumulative)
             if (athlete.actualSwimTime) {
                 const fasterSwimmers = processed.filter(a => 
                     a.actualSwimTime && a.swimCumulative < athlete.swimCumulative
@@ -123,23 +157,23 @@ export class DataProcessor {
             
             if (athlete.actualT1Time) {
                 athlete.t1Rank = processed.filter(a => 
-                    a.actualT1Time && a.t1Cumulative < athlete.t1Cumulative  // FIXED: Added actualT1Time check
+                    a.actualT1Time && a.t1Cumulative < athlete.t1Cumulative
                 ).length + 1;
             }
             
             if (athlete.actualBikeTime) {
                 athlete.bikeRank = processed.filter(a => 
-                    a.actualBikeTime && a.bikeCumulative < athlete.bikeCumulative  // FIXED: Added actualBikeTime check
+                    a.actualBikeTime && a.bikeCumulative < athlete.bikeCumulative
                 ).length + 1;
             }
             
             if (athlete.actualT2Time) {
                 athlete.t2Rank = processed.filter(a => 
-                    a.actualT2Time && a.t2Cumulative < athlete.t2Cumulative  // FIXED: Added actualT2Time check
+                    a.actualT2Time && a.t2Cumulative < athlete.t2Cumulative
                 ).length + 1;
             }
             
-            // Segment-specific ranks (just that segment's time)
+            // Segment-specific ranks
             if (athlete.actualSwimTime) {
                 athlete.swimSegmentRank = finishers.filter(a => 
                     a.actualSwimTime && a.actualSwimTime < athlete.actualSwimTime
@@ -170,7 +204,8 @@ export class DataProcessor {
                 ).length + 1;
             }
         });
-    }    
+    }
+    
     calculateGaps(processed) {
         const swimLeader = Math.min(...processed.map(a => a.swimCumulative));
         const t1Leader = Math.min(...processed.map(a => a.t1Cumulative));
@@ -254,6 +289,10 @@ export class DataProcessor {
             if (b.finalRank) return 1;
             return a.name.localeCompare(b.name);
         });
+    }
+    
+    isNCAA() {
+        return this.raceType === 'ncaa';
     }
 }
 
