@@ -1409,6 +1409,12 @@ table td, table th {
 .checkpoint-indicator .dot.passed {
     background: rgba(255, 255, 255, 0.6);
 }
+.position-changes {
+    font-size: 11px;
+    margin-top: 5px;
+    opacity: 0.9;
+    font-style: italic;
+}
 
 /* Mobile responsiveness */
 @media (max-width: 768px) {

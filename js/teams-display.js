@@ -8,26 +8,38 @@ export class TeamsDisplay {
         this.colorScale = null;
         this.isNCAA = false;
         this.currentCheckpoint = 'finish';
-        this.checkpoints = ['swim', 't1', 'bike', 't2', 'run', 'finish'];
+        this.checkpoints = ['swim', 't1', 'bike', 't2', 'finish'];
         this.checkpointLabels = {
             'swim': 'After Swim',
             't1': 'After T1',
             'bike': 'After Bike',
-            't2': 'After T2', 
-            'run': 'After Run',
+            't2': 'After T2',
             'finish': 'Final Results'
         };
+        this.checkpointStandings = {}; // Cache all checkpoint calculations
     }
 
     setData(data, colorScale, isNCAA) {
         this.processedData = data;
         this.colorScale = colorScale;
         this.isNCAA = isNCAA;
+        
+        // Pre-calculate all checkpoint standings if NCAA
+        if (isNCAA) {
+            this.calculateAllCheckpoints();
+        }
+    }
+
+    calculateAllCheckpoints() {
+        // Calculate standings for each checkpoint once
+        this.checkpoints.forEach(checkpoint => {
+            this.checkpointStandings[checkpoint] = this.calculateTeamStats(checkpoint);
+        });
     }
 
     display() {
         if (!this.processedData) return;
-
+        
         const teamsContent = document.getElementById('teamsContent');
         const teamsTitle = document.getElementById('teamsTitle');
         if (!teamsContent) return;
@@ -55,8 +67,11 @@ export class TeamsDisplay {
             `;
         }
 
-        // Calculate and display team stats for current checkpoint
-        const teamStats = this.calculateTeamStats(this.currentCheckpoint);
+        // Get team stats (from cache for NCAA, calculate once for World Triathlon)
+        const teamStats = this.isNCAA ? 
+            this.checkpointStandings[this.currentCheckpoint] : 
+            this.calculateTeamStats('finish');
+            
         html += this.renderTeamRankings(teamStats);
 
         // Footer notes
@@ -75,6 +90,9 @@ export class TeamsDisplay {
         const canGoBack = currentIndex > 0;
         const canGoForward = currentIndex < this.checkpoints.length - 1;
 
+        // Add position change summary
+        const positionChanges = this.getPositionChanges();
+
         return `
             <div class="checkpoint-navigation">
                 <button class="checkpoint-nav-btn prev ${!canGoBack ? 'disabled' : ''}" 
@@ -89,6 +107,7 @@ export class TeamsDisplay {
                             <span class="dot ${idx === currentIndex ? 'active' : ''} ${idx < currentIndex ? 'passed' : ''}"></span>
                         `).join('')}
                     </div>
+                    ${positionChanges ? `<div class="position-changes">${positionChanges}</div>` : ''}
                 </div>
                 <button class="checkpoint-nav-btn next ${!canGoForward ? 'disabled' : ''}" 
                     data-direction="next" ${!canGoForward ? 'disabled' : ''}>
@@ -96,6 +115,33 @@ export class TeamsDisplay {
                 </button>
             </div>
         `;
+    }
+
+    getPositionChanges() {
+        // Show what changed from previous checkpoint
+        const currentIndex = this.checkpoints.indexOf(this.currentCheckpoint);
+        if (currentIndex === 0) return null;
+
+        const prevCheckpoint = this.checkpoints[currentIndex - 1];
+        const currentStandings = this.checkpointStandings[this.currentCheckpoint];
+        const prevStandings = this.checkpointStandings[prevCheckpoint];
+
+        if (!currentStandings || !prevStandings) return null;
+
+        const changes = [];
+        currentStandings.slice(0, 5).forEach((team, idx) => {
+            const prevIdx = prevStandings.findIndex(t => t.country === team.country);
+            if (prevIdx !== idx) {
+                const diff = prevIdx - idx;
+                if (diff > 0) {
+                    changes.push(`${team.country} ↑${diff}`);
+                } else if (diff < 0) {
+                    changes.push(`${team.country} ↓${Math.abs(diff)}`);
+                }
+            }
+        });
+
+        return changes.length > 0 ? changes.join(', ') : 'No changes in top 5';
     }
 
     setupCheckpointListeners() {
@@ -129,110 +175,142 @@ export class TeamsDisplay {
             teams[athlete.country].push(athlete);
         });
 
-        // Calculate cumulative times up to checkpoint
-        const teamStats = [];
-        Object.keys(teams).forEach(country => {
-            const athletes = teams[country];
-            
-            // Calculate positions at checkpoint
-            const athletesWithTime = athletes.map(athlete => {
+        // Calculate positions at checkpoint
+        let allAthletesAtCheckpoint = [];
+        
+        if (checkpoint === 'finish') {
+            // Use final rankings directly
+            allAthletesAtCheckpoint = this.processedData
+                .filter(a => a.finalRank)
+                .map(a => ({
+                    name: a.name,
+                    country: a.country,
+                    position: a.finalRank,
+                    time: a.actualTotalTime
+                }))
+                .sort((a, b) => a.position - b.position);
+        } else {
+            // Calculate cumulative times and positions
+            const athleteTimes = this.processedData.map(athlete => {
                 let cumulativeTime = 0;
                 let hasTime = true;
                 
-                // Calculate cumulative time up to checkpoint
-                if (checkpoint === 'swim' || checkpoint === 't1' || checkpoint === 'bike' || 
-                    checkpoint === 't2' || checkpoint === 'run' || checkpoint === 'finish') {
-                    if (athlete.actualSwimTime) cumulativeTime += athlete.actualSwimTime;
-                    else hasTime = false;
+                // Add times up to checkpoint
+                if (athlete.actualSwimTime) {
+                    cumulativeTime += athlete.actualSwimTime;
+                } else {
+                    hasTime = false;
                 }
-                if ((checkpoint === 't1' || checkpoint === 'bike' || checkpoint === 't2' || 
-                     checkpoint === 'run' || checkpoint === 'finish') && hasTime) {
-                    if (athlete.t1Time) cumulativeTime += athlete.t1Time;
-                    else if (checkpoint !== 'swim') hasTime = false;
-                }
-                if ((checkpoint === 'bike' || checkpoint === 't2' || checkpoint === 'run' || 
-                     checkpoint === 'finish') && hasTime) {
-                    if (athlete.actualBikeTime) cumulativeTime += athlete.actualBikeTime;
-                    else hasTime = false;
-                }
-                if ((checkpoint === 't2' || checkpoint === 'run' || checkpoint === 'finish') && hasTime) {
-                    if (athlete.t2Time) cumulativeTime += athlete.t2Time;
-                    else if (checkpoint !== 'bike' && checkpoint !== 't1' && checkpoint !== 'swim') hasTime = false;
-                }
-                if ((checkpoint === 'run' || checkpoint === 'finish') && hasTime) {
-                    if (athlete.actualRunTime) cumulativeTime += athlete.actualRunTime;
-                    else if (checkpoint === 'finish') hasTime = false;
-                }
-
-                return {
-                    ...athlete,
-                    checkpointTime: hasTime ? cumulativeTime : null,
-                    hasTime
-                };
-            }).filter(a => a.hasTime);
-
-            if (athletesWithTime.length === 0) return;
-
-            // Sort all athletes by checkpoint time to get positions
-            const allAthletesAtCheckpoint = this.processedData.map(athlete => {
-                let cumulativeTime = 0;
-                let hasTime = true;
                 
-                // Same calculation as above
-                if (checkpoint === 'swim' || checkpoint === 't1' || checkpoint === 'bike' || 
-                    checkpoint === 't2' || checkpoint === 'run' || checkpoint === 'finish') {
-                    if (athlete.actualSwimTime) cumulativeTime += athlete.actualSwimTime;
-                    else hasTime = false;
+                if (checkpoint !== 'swim' && hasTime) {
+                    if (athlete.t1Time) {
+                        cumulativeTime += athlete.t1Time;
+                    }
                 }
-                if ((checkpoint === 't1' || checkpoint === 'bike' || checkpoint === 't2' || 
-                     checkpoint === 'run' || checkpoint === 'finish') && hasTime) {
-                    if (athlete.t1Time) cumulativeTime += athlete.t1Time;
+                
+                if ((checkpoint === 'bike' || checkpoint === 't2') && hasTime) {
+                    if (athlete.actualBikeTime) {
+                        cumulativeTime += athlete.actualBikeTime;
+                    } else {
+                        hasTime = false;
+                    }
                 }
-                if ((checkpoint === 'bike' || checkpoint === 't2' || checkpoint === 'run' || 
-                     checkpoint === 'finish') && hasTime) {
-                    if (athlete.actualBikeTime) cumulativeTime += athlete.actualBikeTime;
-                    else hasTime = false;
-                }
-                if ((checkpoint === 't2' || checkpoint === 'run' || checkpoint === 'finish') && hasTime) {
-                    if (athlete.t2Time) cumulativeTime += athlete.t2Time;
-                }
-                if ((checkpoint === 'run' || checkpoint === 'finish') && hasTime) {
-                    if (athlete.actualRunTime) cumulativeTime += athlete.actualRunTime;
-                    else if (checkpoint === 'finish') hasTime = false;
+                
+                if (checkpoint === 't2' && hasTime) {
+                    if (athlete.t2Time) {
+                        cumulativeTime += athlete.t2Time;
+                    }
                 }
 
                 return {
                     name: athlete.name,
                     country: athlete.country,
-                    time: hasTime ? cumulativeTime : Infinity
+                    time: hasTime ? cumulativeTime : null,
+                    athlete: athlete
                 };
-            }).filter(a => a.time !== Infinity)
+            }).filter(a => a.time !== null)
               .sort((a, b) => a.time - b.time);
 
             // Assign positions
-            athletesWithTime.forEach(athlete => {
-                const position = allAthletesAtCheckpoint.findIndex(a => a.name === athlete.name) + 1;
-                athlete.checkpointPosition = position;
+            athleteTimes.forEach((item, idx) => {
+                item.position = idx + 1;
             });
 
-            // Sort team athletes by position
-            athletesWithTime.sort((a, b) => a.checkpointPosition - b.checkpointPosition);
+            allAthletesAtCheckpoint = athleteTimes;
+        }
 
-            // Use checkpoint-specific logic for final results
-            if (checkpoint === 'finish') {
-                // Use actual final rankings
-                const finishers = athletes
-                    .filter(a => a.finalRank)
-                    .sort((a, b) => a.finalRank - b.finalRank);
-                
-                if (finishers.length === 0) return;
+        // Build team stats
+        const teamStats = [];
+        Object.keys(teams).forEach(country => {
+            const athletes = teams[country];
+            
+            // Get athletes with positions at this checkpoint
+            const teamAthletesAtCheckpoint = athletes.map(athlete => {
+                const checkpointData = allAthletesAtCheckpoint.find(a => a.name === athlete.name);
+                if (checkpointData) {
+                    return {
+                        ...athlete,
+                        checkpointPosition: checkpointData.position,
+                        checkpointTime: checkpointData.time
+                    };
+                }
+                return null;
+            }).filter(a => a !== null)
+              .sort((a, b) => a.checkpointPosition - b.checkpointPosition);
 
-                // Standard team stats calculation
-                this.addTeamStatsForFinish(teamStats, country, finishers, athletes);
+            if (teamAthletesAtCheckpoint.length === 0) return;
+
+            // Calculate team score and averages
+            let score = null;
+            let scoringAthletes = [];
+            let displacers = [];
+            let complete = false;
+
+            if (this.isNCAA) {
+                if (teamAthletesAtCheckpoint.length >= 5) {
+                    scoringAthletes = teamAthletesAtCheckpoint.slice(0, 5);
+                    score = scoringAthletes.reduce((sum, a) => sum + a.checkpointPosition, 0);
+                    displacers = teamAthletesAtCheckpoint.slice(5, 7);
+                    complete = true;
+                } else {
+                    scoringAthletes = teamAthletesAtCheckpoint;
+                    score = teamAthletesAtCheckpoint.reduce((sum, a) => sum + a.checkpointPosition, 0) + 
+                        (5 - teamAthletesAtCheckpoint.length) * 100;
+                    complete = false;
+                }
             } else {
-                // Calculate based on checkpoint positions
-                this.addTeamStatsForCheckpoint(teamStats, country, athletesWithTime, athletes, checkpoint);
+                scoringAthletes = teamAthletesAtCheckpoint;
             }
+
+            const avgTime = scoringAthletes.reduce((sum, a) => sum + a.checkpointTime, 0) / scoringAthletes.length;
+            const avgPosition = scoringAthletes.reduce((sum, a) => sum + a.checkpointPosition, 0) / scoringAthletes.length;
+
+            // Add segment averages only for final results
+            let segmentAverages = {};
+            if (checkpoint === 'finish') {
+                segmentAverages = {
+                    avgSwimPace: scoringAthletes.reduce((sum, a) => 
+                        sum + (a.actualSwimTime / RaceConfig.distances.swim) * 100, 0) / scoringAthletes.length,
+                    avgBikeSpeed: scoringAthletes.reduce((sum, a) => 
+                        sum + (RaceConfig.distances.bike / (a.actualBikeTime / 3600)), 0) / scoringAthletes.length,
+                    avgRunPace: scoringAthletes.reduce((sum, a) => 
+                        sum + (a.actualRunTime / RaceConfig.distances.run / 60), 0) / scoringAthletes.length
+                };
+            }
+
+            teamStats.push({
+                country,
+                score,
+                avgPosition,
+                avgFinishTime: avgTime,
+                scoringAthletes,
+                displacers,
+                allAthletes: athletes,
+                finishers: teamAthletesAtCheckpoint,
+                complete,
+                checkpoint,
+                ...segmentAverages
+            });
         });
 
         // Sort teams
@@ -243,98 +321,6 @@ export class TeamsDisplay {
         }
 
         return teamStats;
-    }
-
-    addTeamStatsForCheckpoint(teamStats, country, athletesWithTime, allAthletes, checkpoint) {
-        if (athletesWithTime.length === 0) return;
-
-        // Calculate average time
-        const avgTime = athletesWithTime.reduce((sum, a) => sum + a.checkpointTime, 0) / athletesWithTime.length;
-        
-        let score = null;
-        let scoringAthletes = [];
-        let displacers = [];
-        let complete = false;
-
-        if (this.isNCAA) {
-            if (athletesWithTime.length >= 5) {
-                scoringAthletes = athletesWithTime.slice(0, 5);
-                score = scoringAthletes.reduce((sum, a) => sum + a.checkpointPosition, 0);
-                displacers = athletesWithTime.slice(5, 7);
-                complete = true;
-            } else {
-                scoringAthletes = athletesWithTime;
-                score = athletesWithTime.reduce((sum, a) => sum + a.checkpointPosition, 0) + 
-                    (5 - athletesWithTime.length) * 100;
-                complete = false;
-            }
-        } else {
-            scoringAthletes = athletesWithTime;
-        }
-
-        teamStats.push({
-            country,
-            score,
-            avgPosition: athletesWithTime.reduce((sum, a) => sum + a.checkpointPosition, 0) / athletesWithTime.length,
-            avgFinishTime: avgTime,
-            scoringAthletes,
-            displacers,
-            allAthletes,
-            finishers: athletesWithTime,
-            complete,
-            checkpoint
-        });
-    }
-
-    addTeamStatsForFinish(teamStats, country, finishers, allAthletes) {
-        // Standard finish calculation (existing logic)
-        const avgPosition = finishers.reduce((sum, a) => sum + a.finalRank, 0) / finishers.length;
-        const avgFinishTime = finishers.reduce((sum, a) => sum + a.actualTotalTime, 0) / finishers.length;
-        
-        let score = null;
-        let scoringAthletes = [];
-        let displacers = [];
-        let complete = false;
-        
-        if (this.isNCAA) {
-            if (finishers.length >= 5) {
-                scoringAthletes = finishers.slice(0, 5);
-                score = scoringAthletes.reduce((sum, a) => sum + a.finalRank, 0);
-                displacers = finishers.slice(5, 7);
-                complete = true;
-            } else {
-                scoringAthletes = finishers;
-                score = finishers.reduce((sum, a) => sum + a.finalRank, 0) + 
-                    (5 - finishers.length) * 100;
-                complete = false;
-            }
-        } else {
-            scoringAthletes = finishers;
-        }
-        
-        // Calculate averages only for finish
-        const avgSwimPace = scoringAthletes.reduce((sum, a) => 
-            sum + (a.actualSwimTime / RaceConfig.distances.swim) * 100, 0) / scoringAthletes.length;
-        const avgBikeSpeed = scoringAthletes.reduce((sum, a) => 
-            sum + (RaceConfig.distances.bike / (a.actualBikeTime / 3600)), 0) / scoringAthletes.length;
-        const avgRunPace = scoringAthletes.reduce((sum, a) => 
-            sum + (a.actualRunTime / RaceConfig.distances.run / 60), 0) / scoringAthletes.length;
-        
-        teamStats.push({
-            country,
-            score,
-            avgPosition,
-            avgFinishTime,
-            scoringAthletes,
-            displacers,
-            allAthletes,
-            finishers,
-            complete,
-            avgSwimPace,
-            avgBikeSpeed,
-            avgRunPace,
-            checkpoint: 'finish'
-        });
     }
 
     renderTeamRankings(teamStats) {
@@ -350,7 +336,7 @@ export class TeamsDisplay {
             const teamColor = this.getTeamColorForDisplay(team.country);
             
             // Position display based on checkpoint
-            const positionDisplay = this.currentCheckpoint === 'finish' ? 
+            const positionDisplay = team.checkpoint === 'finish' ? 
                 team.scoringAthletes.map(a => a.finalRank) :
                 team.scoringAthletes.map(a => a.checkpointPosition);
 
@@ -379,7 +365,7 @@ export class TeamsDisplay {
                             ).join('')}
                             ${this.isNCAA && team.displacers.length > 0 ? 
                                 team.displacers.map(a => {
-                                    const pos = this.currentCheckpoint === 'finish' ? a.finalRank : a.checkpointPosition;
+                                    const pos = team.checkpoint === 'finish' ? a.finalRank : a.checkpointPosition;
                                     return `<span class="pos displacer">#${pos}</span>`;
                                 }).join('') : ''
                             }
@@ -555,7 +541,12 @@ export class TeamsDisplay {
         return `${mins}:${secs.toString().padStart(2, '0')}/km`;
     }
 
+
     refresh() {
+        // Recalculate all checkpoints if NCAA
+        if (this.isNCAA) {
+            this.calculateAllCheckpoints();
+        }
         // Re-display with current checkpoint
         this.display();
     }
