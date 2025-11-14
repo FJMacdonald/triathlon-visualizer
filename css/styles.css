@@ -1567,11 +1567,44 @@ table td, table th {
     border-left: 4px solid #28a745;
 }
 
+/* Pack Badges */
+.pack-badge {
+    font-size: 0.75em;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 10px;
+    text-transform: uppercase;
+}
+
+.current-badge {
+    background: #667eea;
+    color: white;
+}
+
+.ahead-badge {
+    background: #28a745;
+    color: white;
+}
+
+.behind-badge {
+    background: #6c757d;
+    color: white;
+}
+
+/* Pack Header Click */
 .pack-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 12px;
+    cursor: pointer;
+    padding: 5px;
+    margin: -5px;
+    border-radius: 6px;
+    transition: background 0.2s;
+}
+
+.pack-header:hover {
+    background: rgba(0, 0, 0, 0.05);
 }
 
 .pack-title {
@@ -1594,20 +1627,17 @@ table td, table th {
     font-size: 0.85em;
 }
 
-.bridging-badge {
-    background: #ffc107;
-    color: #333;
-    padding: 3px 8px;
-    border-radius: 12px;
-    font-size: 0.85em;
-    font-weight: 600;
+.expand-icon {
+    color: #666;
+    font-size: 0.9em;
+    transition: transform 0.3s;
 }
 
 .pack-stats {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 10px;
-    margin-bottom: 12px;
+    margin: 12px 0;
 }
 
 .pack-stats .stat {
@@ -1630,9 +1660,23 @@ table td, table th {
     color: #333;
 }
 
-.pack-members {
+/* Pack Members */
+.pack-members-container {
     border-top: 1px solid #e0e0e0;
     padding-top: 10px;
+    margin-top: 10px;
+    animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        max-height: 0;
+    }
+    to {
+        opacity: 1;
+        max-height: 500px;
+    }
 }
 
 .members-header {
@@ -1648,7 +1692,7 @@ table td, table th {
 
 .member {
     display: grid;
-    grid-template-columns: 2fr 1fr 1fr;
+    grid-template-columns: 2fr 0.8fr 1fr 0.8fr;
     align-items: center;
     padding: 4px 8px;
     background: #f8f9fa;
@@ -1659,7 +1703,6 @@ table td, table th {
 .member.current-athlete {
     background: #667eea;
     color: white;
-    font-weight: 600;
 }
 
 .member.teammate {
@@ -1678,6 +1721,16 @@ table td, table th {
 .member-bike {
     text-align: right;
     font-weight: 600;
+}
+
+.member-rank {
+    text-align: right;
+    font-weight: 600;
+    color: #667eea;
+}
+
+.member.current-athlete .member-rank {
+    color: white;
 }
 
 /* Strategy Section */
@@ -1745,22 +1798,29 @@ table td, table th {
     border-left: 4px solid #28a745;
 }
 
-.time-display {
+.time-main {
     display: flex;
-    align-items: center;
+    align-items: baseline;
     gap: 15px;
     margin-bottom: 10px;
 }
 
-.time-label {
-    font-weight: 600;
+.time-requirement .time-label {
+    font-size: 0.95em;
     color: #666;
 }
 
-.time-value {
-    font-size: 1.5em;
+.time-requirement .time-value {
+    font-size: 1.8em;
     font-weight: bold;
-    color: #333;
+}
+
+.time-cost .time-value {
+    color: #dc3545;
+}
+
+.time-saved .time-value {
+    color: #28a745;
 }
 
 .time-breakdown {
@@ -1888,6 +1948,11 @@ table td, table th {
     padding: 20px;
     border-radius: 8px;
     margin-top: 20px;
+}
+
+.run-section h5 {
+    color: #333;
+    margin-bottom: 15px;
 }
 
 .fatigue-warning {
@@ -2058,6 +2123,122 @@ table td, table th {
     color: #333;
 }
 
+/* Team Ranking Display */
+.team-ranking {
+    text-align: center;
+    padding: 15px;
+    background: white;
+    border-radius: 8px;
+    margin-bottom: 15px;
+}
+
+.team-ranking.better {
+    background: #d4edda;
+}
+
+.team-ranking.worse {
+    background: #f8d7da;
+}
+
+.team-rank {
+    display: block;
+    font-size: 2em;
+    font-weight: bold;
+    color: #333;
+}
+
+.team-score-label {
+    display: block;
+    font-size: 0.9em;
+    color: #666;
+    margin-top: 5px;
+}
+
+/* Team Scoring Breakdown */
+.team-breakdown {
+    background: white;
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 12px;
+}
+
+.breakdown-section {
+    margin-bottom: 10px;
+}
+
+.breakdown-section:last-child {
+    margin-bottom: 0;
+}
+
+.breakdown-section label {
+    display: block;
+    font-size: 0.85em;
+    color: #666;
+    margin-bottom: 5px;
+}
+
+.breakdown-positions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 5px;
+}
+
+.scoring-pos, .displacer-pos {
+    background: #e9ecef;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 0.9em;
+}
+
+.scoring-pos.current {
+    background: #667eea;
+    color: white;
+}
+
+.scoring-pos.changed {
+    background: #ffc107;
+    color: #333;
+}
+
+.displacer-pos {
+    background: #d1ecf1;
+    color: #0c5460;
+}
+
+.displacer-pos.current {
+    background: #667eea;
+    color: white;
+}
+
+.breakdown-total {
+    font-weight: 600;
+    font-size: 1.1em;
+    color: #333;
+}
+
+.breakdown-total.better {
+    color: #28a745;
+}
+
+.breakdown-total.worse {
+    color: #dc3545;
+}
+
+.breakdown-section.displacers label {
+    color: #0c5460;
+}
+
+/* Team Athletes List */
+.team-athletes {
+    max-height: 200px;
+    overflow-y: auto;
+    background: white;
+    border-radius: 6px;
+    padding: 8px;
+}
+
 .team-positions {
     display: grid;
     gap: 5px;
@@ -2081,75 +2262,98 @@ table td, table th {
     background: #fff3cd;
 }
 
-.team-score {
-    padding: 10px;
-    background: white;
-    border-radius: 6px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.team-score.better {
-    background: #d4edda;
-}
-
-.team-score.worse {
-    background: #f8d7da;
-}
-
 .team-impact {
     background: white;
     padding: 15px;
     border-radius: 8px;
 }
 
-.impact-summary {
-    padding: 12px;
-    border-radius: 6px;
-    text-align: center;
-    font-weight: 600;
-    margin-bottom: 10px;
+.impact-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    margin-bottom: 15px;
 }
 
-.impact-summary.positive {
-    background: #d4edda;
-    color: #155724;
-}
-
-.impact-summary.negative {
-    background: #f8d7da;
-    color: #721c24;
-}
-
-.impact-summary.neutral {
+/* Context - Final Team Standings */
+.team-context {
     background: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    margin-top: 10px;
+}
+
+.team-context h6 {
+    margin: 0 0 10px 0;
     color: #333;
+    font-size: 1em;
+    border-bottom: 2px solid #667eea;
+    padding-bottom: 5px;
 }
 
-.team-insights {
-    padding: 10px;
-    background: #f8f9fa;
-    border-radius: 6px;
+.rankings-list {
+    display: grid;
+    gap: 8px;
+}
+
+.context-team {
+    display: grid;
+    grid-template-columns: 50px 60px 80px 1fr;
+    align-items: center;
+    padding: 8px 10px;
+    background: white;
+    border-radius: 4px;
     font-size: 0.9em;
-    color: #666;
 }
 
-/* Scrollbar styling for pack container */
-.pack-container::-webkit-scrollbar {
+.context-team.your-team {
+    background: #667eea;
+    color: white;
+    font-weight: 600;
+}
+
+.context-team .rank {
+    font-weight: 600;
+}
+
+.context-team .country {
+    font-weight: 500;
+}
+
+.context-team .score {
+    text-align: right;
+}
+
+.context-team .gap {
+    text-align: right;
+    font-size: 0.85em;
+    opacity: 0.8;
+}
+
+.context-team.your-team .gap {
+    opacity: 1;
+    font-weight: bold;
+}
+
+/* Scrollbar styling */
+.pack-container::-webkit-scrollbar,
+.team-athletes::-webkit-scrollbar {
     width: 8px;
 }
 
-.pack-container::-webkit-scrollbar-track {
+.pack-container::-webkit-scrollbar-track,
+.team-athletes::-webkit-scrollbar-track {
     background: #f1f1f1;
     border-radius: 4px;
 }
 
-.pack-container::-webkit-scrollbar-thumb {
+.pack-container::-webkit-scrollbar-thumb,
+.team-athletes::-webkit-scrollbar-thumb {
     background: #888;
     border-radius: 4px;
 }
 
-.pack-container::-webkit-scrollbar-thumb:hover {
+.pack-container::-webkit-scrollbar-thumb:hover,
+.team-athletes::-webkit-scrollbar-thumb:hover {
     background: #555;
 }
