@@ -1321,3 +1321,112 @@ table td, table th {
         padding: 1px 4px;
     }
 }
+/* ========================================
+   Checkpoint Navigation
+   ======================================== */
+
+.checkpoint-navigation {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    padding: 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 12px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.checkpoint-nav-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: white;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.checkpoint-nav-btn:hover:not(.disabled) {
+    transform: scale(1.1);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.checkpoint-nav-btn.disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.checkpoint-nav-btn .arrow {
+    font-size: 20px;
+    color: #667eea;
+    font-weight: bold;
+}
+
+.checkpoint-info {
+    text-align: center;
+    color: white;
+    min-width: 200px;
+}
+
+.checkpoint-label {
+    font-size: 12px;
+    opacity: 0.9;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.checkpoint-name {
+    font-size: 24px;
+    font-weight: 700;
+    margin: 5px 0;
+}
+
+.checkpoint-indicator {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    margin-top: 10px;
+}
+
+.checkpoint-indicator .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.3);
+    transition: all 0.3s ease;
+}
+
+.checkpoint-indicator .dot.active {
+    background: white;
+    transform: scale(1.5);
+}
+
+.checkpoint-indicator .dot.passed {
+    background: rgba(255, 255, 255, 0.6);
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+    .checkpoint-navigation {
+        gap: 10px;
+        padding: 15px;
+    }
+    
+    .checkpoint-nav-btn {
+        width: 35px;
+        height: 35px;
+    }
+    
+    .checkpoint-name {
+        font-size: 18px;
+    }
+    
+    .checkpoint-info {
+        min-width: 150px;
+    }
+}

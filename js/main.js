@@ -9,6 +9,7 @@ import { summaryDisplay } from './ui/controls.js';
 import { hypotheticalAnalysis } from './hypothetical.js';
 import { responsiveManager } from './utils/responsive.js';
 import { secondsToTime, secondsToMinSec, getFlag, getTeamIcon } from './utils/formatters.js';
+import { TeamsDisplay } from './teams-display.js';
 
 class TriathlonVisualizer {
     constructor() {
@@ -17,7 +18,8 @@ class TriathlonVisualizer {
         this.spiderChart = null;
         this.colorScale = null;
         this.currentTab = 'summary';
-        
+        this.teamsDisplay = new TeamsDisplay();
+
         this.init();
     }
     
@@ -57,6 +59,9 @@ class TriathlonVisualizer {
                     resultsSection.style.display = 'block';
                     
                     this.initializeCharts(processedData);
+                    if (this.currentTab === 'teams') {
+                        this.teamsDisplay.refresh();
+                    }
                     
                 } catch (error) {
                     console.error('Error processing file:', error);
@@ -120,6 +125,10 @@ class TriathlonVisualizer {
         
         // Draw initial chart (rank chart is shown by default after switching to rank tab)
         this.rankChart.draw();
+
+        // Initialize teams display
+        this.teamsDisplay.setData(data, this.colorScale, dataProcessor.isNCAA());
+
         
         // Store references for later use
         this.athleteVisibility = athleteVisibility;
@@ -246,7 +255,7 @@ class TriathlonVisualizer {
                 
             case 'teams':
                 sidebarManager.hide();
-                this.displayTeamPerformances();
+                this.teamsDisplay.display();
                 break;                
                 
             case 'settings':
@@ -527,236 +536,7 @@ class TriathlonVisualizer {
         });
     }
 
-    displayTeamPerformances() {
-        if (!this.processedData) return;
-        
-        const teamsContent = document.getElementById('teamsContent'); 
-        const teamsTitle = document.getElementById('teamsTitle');
-        if (!teamsContent) return;
-        
-        const isNCAA = dataProcessor.isNCAA();
-        
-        // Update title based on race type
-        if (teamsTitle) {
-            teamsTitle.textContent = isNCAA ? '🏅 Team Performances' : '🌍 Country Analysis';
-        }
-        
-        // Group athletes by country/team
-        const teams = {};
-        this.processedData.forEach(athlete => {
-            if (!teams[athlete.country]) {
-                teams[athlete.country] = [];
-            }
-            teams[athlete.country].push(athlete);
-        });
-        
-        // Calculate team statistics
-        const teamStats = [];
-        Object.keys(teams).forEach(country => {
-            const athletes = teams[country];
-            const finishers = athletes
-                .filter(a => a.finalRank)
-                .sort((a, b) => a.finalRank - b.finalRank);
-            
-            if (finishers.length === 0) return;
-            
-            // Calculate average finish position
-            const avgPosition = finishers.reduce((sum, a) => sum + a.finalRank, 0) / finishers.length;
-            
-            // Calculate average finish time
-            const avgFinishTime = finishers.reduce((sum, a) => sum + a.actualTotalTime, 0) / finishers.length;
-            
-            // For NCAA: top 5 scoring
-            let score = null;
-            let scoringAthletes = [];
-            let displacers = [];
-            let complete = false;
-            
-            if (isNCAA) {
-                if (finishers.length >= 5) {
-                    scoringAthletes = finishers.slice(0, 5);
-                    score = scoringAthletes.reduce((sum, a) => sum + a.finalRank, 0);
-                    displacers = finishers.slice(5, 7);
-                    complete = true;
-                } else {
-                    scoringAthletes = finishers;
-                    score = finishers.reduce((sum, a) => sum + a.finalRank, 0) + 
-                        (5 - finishers.length) * 100;
-                    complete = false;
-                }
-            } else {
-                // For World Triathlon, use all finishers
-                scoringAthletes = finishers;
-            }
-            
-            // Calculate team averages
-            const avgSwimPace = scoringAthletes.reduce((sum, a) => 
-                sum + (a.actualSwimTime / RaceConfig.distances.swim) * 100, 0) / scoringAthletes.length;
-            const avgBikeSpeed = scoringAthletes.reduce((sum, a) => 
-                sum + (RaceConfig.distances.bike / (a.actualBikeTime / 3600)), 0) / scoringAthletes.length;
-            const avgRunPace = scoringAthletes.reduce((sum, a) => 
-                sum + (a.actualRunTime / RaceConfig.distances.run / 60), 0) / scoringAthletes.length;
-            
-            teamStats.push({
-                country,
-                score,
-                avgPosition,
-                avgFinishTime,
-                scoringAthletes,
-                displacers,
-                allAthletes: athletes,
-                finishers,
-                complete,
-                avgSwimPace,
-                avgBikeSpeed,
-                avgRunPace
-            });
-        });
-        
-        // Sort by appropriate metric
-        if (isNCAA) {
-            teamStats.sort((a, b) => a.score - b.score);
-        } else {
-            teamStats.sort((a, b) => a.avgFinishTime - b.avgFinishTime);
-        }
-        
-        // Get team color
-        const getTeamColorForDisplay = (country) => {
-            const teamAthlete = this.processedData.find(a => a.country === country);
-            return teamAthlete ? this.colorScale(teamAthlete.name) : '#666';
-        };
-        
-        // Get team icon/flag
-        const getTeamIconForDisplay = (country) => {
-            if (isNCAA) {
-                return getTeamIcon(country, true);
-            }
-            return getFlag(country);
-        };
-        
-        let html = '';
-        
-        // Add info box for World Triathlon
-        if (!isNCAA) {
-            html += `
-                <div class="country-info-box">
-                    <h3>📊 Country Performance Analysis</h3>
-                    <p>Athletes grouped by country and ranked by average finishing time. 
-                    This analysis shows which countries had the strongest overall performances.</p>
-                </div>
-            `;
-        }
-        
-        html += `<div class="${isNCAA ? 'team-rankings' : 'country-rankings'}">`;
-        
-        const medals = ['🥇', '🥈', '🥉'];
-        const podiumColors = ['#FFD700', '#C0C0C0', '#CD7F32'];
-        
-        teamStats.forEach((team, index) => {
-            const teamIcon = getTeamIconForDisplay(team.country);
-            const medal = index < 3 ? medals[index] : `${index + 1}.`;
-            const borderColor = index < 3 ? podiumColors[index] : '#ddd';
-            const teamColor = getTeamColorForDisplay(team.country);
-            
-            // Format statistics
-            const avgSwimFormatted = secondsToTime(team.avgSwimPace) + '/100m';
-            const avgBikeFormatted = team.avgBikeSpeed.toFixed(1) + ' km/h';
-            const avgRunMins = Math.floor(team.avgRunPace);
-            const avgRunSecs = Math.round((team.avgRunPace % 1) * 60);
-            const avgRunFormatted = `${avgRunMins}:${avgRunSecs.toString().padStart(2, '0')}/km`;
-            
-            const avgFinishFormatted = secondsToTime(team.avgFinishTime);
-            const athleteCount = team.finishers.length;
-            
-            html += `
-                <div class="team-row ${index < 3 ? 'podium' : ''}" style="border-left: 4px solid ${borderColor};">
-                    <div class="team-summary" onclick="this.parentElement.classList.toggle('expanded')">
-                        <div class="team-rank">${medal}</div>
-                        <div class="team-info">
-                            <span class="team-name" style="color: ${teamColor};">${teamIcon} ${team.country}</span>
-                            ${isNCAA ? 
-                                `<span class="team-score">${team.score}${!team.complete ? '*' : ''} pts</span>` :
-                                `<span class="team-score">Avg: ${avgFinishFormatted} (${athleteCount} athlete${athleteCount !== 1 ? 's' : ''})</span>`
-                            }
-                        </div>
-                        <div class="team-averages">
-                            <span class="avg swim" title="Avg Swim Pace">🏊 ${avgSwimFormatted}</span>
-                            <span class="avg bike" title="Avg Bike Speed">🚴 ${avgBikeFormatted}</span>
-                            <span class="avg run" title="Avg Run Pace">🏃 ${avgRunFormatted}</span>
-                        </div>
-                        <div class="scoring-positions">
-                            ${team.scoringAthletes.map(a => 
-                                `<span class="pos ${isNCAA && team.scoringAthletes.indexOf(a) < 5 ? 'scoring' : 'counting'}" 
-                                    style="background: ${teamColor};">#${a.finalRank}</span>`
-                            ).join('')}
-                            ${isNCAA && team.displacers.length > 0 ? 
-                                team.displacers.map(a => `<span class="pos displacer">#${a.finalRank}</span>`).join('') : 
-                                ''
-                            }
-                        </div>
-                        <div class="expand-icon">▼</div>
-                    </div>
-                    <div class="team-details">
-                        <table class="athletes-table">
-                            <thead>
-                                <tr>
-                                    <th>Pos</th>
-                                    <th>Athlete</th>
-                                    <th>Total</th>
-                                    <th>Swim</th>
-                                    <th>Bike</th>
-                                    <th>Run</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${team.scoringAthletes.map((athlete, idx) => 
-                                    this.createAthleteTableRow(athlete, isNCAA && idx < 5, teamColor)
-                                ).join('')}
-                                ${isNCAA && team.displacers.length > 0 ? `
-                                    <tr class="divider-row"><td colspan="6">Displacers</td></tr>
-                                    ${team.displacers.map(athlete => 
-                                        this.createAthleteTableRow(athlete, false, teamColor)
-                                    ).join('')}
-                                ` : ''}
-                            </tbody>
-                        </table>
-                        ${team.allAthletes.length > team.scoringAthletes.length + team.displacers.length ? `
-                            <div class="other-athletes">
-                                ${isNCAA ? 'Other:' : 'Did not finish:'} ${team.allAthletes
-                                    .filter(a => !team.scoringAthletes.includes(a) && !team.displacers.includes(a))
-                                    .map(a => `${a.baseName} (${a.finalRank ? '#' + a.finalRank : a.status})`)
-                                    .join(', ')}
-                            </div>
-                        ` : ''}
-                    </div>
-                </div>
-            `;
-        });
-        
-        html += '</div>';
-        
-        // Footer notes
-        if (isNCAA) {
-            if (teamStats.some(t => !t.complete)) {
-                html += '<p class="scoring-note">* Team did not have 5 finishers. Penalty of 100 points per missing athlete applied.</p>';
-            }
-            html += `
-                <div class="scoring-rules">
-                    <strong>NCAA Scoring:</strong> Sum of positions for top 5 finishers (lower is better). 
-                    Next 2 finishers are displacers. Averages based on scoring athletes only.
-                </div>
-            `;
-        } else {
-            html += `
-                <div class="scoring-rules">
-                    <strong>Analysis Method:</strong> Countries ranked by average finishing time of all finishers. 
-                    Performance averages calculated across all athletes from each country.
-                </div>
-            `;
-        }
-        
-        teamsContent.innerHTML = html;
-    }
+
 
     createAthleteTableRow(athlete, isScoring, teamColor) {
         const swimPace = athlete.actualSwimTime ? 
